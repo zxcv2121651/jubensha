@@ -32,11 +32,13 @@
     "vite": "^6.2.0"
   },
   "devDependencies": {
+    "@prisma/client": "^5.22.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/simple-peer": "^9.11.9",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.0",
+    "prisma": "^5.22.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

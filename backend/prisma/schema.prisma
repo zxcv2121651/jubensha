@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  name      String
+  bio       String?
+  avatar    String?
+  balance   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  reviews   Review[]
+  rooms     Room[]   @relation("HostRooms")
+}
+
+model Script {
+  id          String   @id @default(cuid())
+  title       String
+  duration    String
+  difficulty  String
+  description String
+  rating      Float    @default(0.0)
+
+  reviews     Review[]
+  rooms       Room[]
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  content   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  script    Script   @relation(fields: [scriptId], references: [id])
+  scriptId  String
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  status    String   @default("waiting") // waiting, playing, finished
+  createdAt DateTime @default(now())
+
+  host      User     @relation("HostRooms", fields: [hostId], references: [id])
+  hostId    String
+  script    Script   @relation(fields: [scriptId], references: [id])
+  scriptId  String
+}
