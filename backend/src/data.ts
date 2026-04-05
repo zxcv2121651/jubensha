@@ -28,6 +28,30 @@ export const rooms = [
     host: 'User1',
     currentPlayers: 4,
     targetPlayers: 6,
-    status: 'waiting'
+    status: 'waiting', // waiting, playing, finished
+    players: ['User1', 'User2', 'User3', 'User4']
   }
 ];
+
+export const users = [
+  {
+    id: 'user_1',
+    name: '剧本杀老司机',
+    bio: '推理无情，沉浸有爱。',
+    stats: { played: 42, favorites: 15, reviews: 8 },
+    history: [
+      { id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队' }
+    ],
+    favorites: ['1', '2']
+  }
+];
+
+export const roomStates: Record<string, any> = {
+  'room_1': {
+    currentAct: 'act_1',
+    revealedClues: ['clue_1', 'clue_2'],
+    chatLog: [
+      { userId: 'user_1', text: '大家好！', timestamp: Date.now() }
+    ]
+  }
+};
