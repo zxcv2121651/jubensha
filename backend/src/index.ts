@@ -2,8 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
-import { AccessToken } from 'livekit-server-sdk';
-import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports } from './data';
+import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages } from './data';
 
 const app = express();
 app.use(cors());
@@ -14,42 +13,11 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }
 });
 
+// --- Helper ---
+const getChatKey = (id1: string, id2: string) => [id1, id2].sort().join('_');
+
 // --- Health Check ---
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-
-// --- LiveKit Voice Token API ---
-// These should normally come from environment variables (.env)
-const LIVEKIT_URL = process.env.LIVEKIT_URL || 'ws://localhost:7880';
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'devkey';
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'secret';
-
-app.get('/api/rooms/:id/voice-token', (req, res) => {
-  const roomId = req.params.id;
-  const userId = req.query.userId as string;
-  const userName = req.query.userName as string;
-
-  if (!userId || !userName) {
-    return res.status(400).json({ success: false, message: 'Missing userId or userName' });
-  }
-
-  // Generate a token for the user to join the specific LiveKit room
-  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-    identity: userId,
-    name: userName,
-  });
-
-  // Grant permissions
-  at.addGrant({
-    roomJoin: true,
-    room: roomId,
-    canPublish: true,
-    canSubscribe: true,
-  });
-
-  const token = at.toJwt();
-  res.json({ success: true, data: { token, url: LIVEKIT_URL } });
-});
-
 
 // --- Auth APIs ---
 app.post('/api/auth/login', (req, res) => {
@@ -69,34 +37,21 @@ app.post('/api/auth/register', (req, res) => {
   }
   const newUser = {
     id: `user_${Date.now()}`, username, password, name: name || username, bio: '', avatar: 'https://picsum.photos/seed/new/150/150',
-    stats: { played: 0, favorites: 0, reviews: 0 }, history: [], favorites: [], friends: [], inventory: [], library: []
+    stats: { played: 0, favorites: 0, reviews: 0, rating: 0 }, history: [], favorites: [], friends: [], inventory: [], library: [], achievements: []
   };
   users.push(newUser);
   const { password: _, ...safeUser } = newUser;
   res.status(201).json({ success: true, data: { token: `fake-jwt-token-${newUser.id}`, user: safeUser } });
 });
 
-// --- Notifications APIs ---
-app.get('/api/users/:id/notifications', (req, res) => {
-  const userNotifs = notifications.filter(n => n.userId === req.params.id);
-  res.json({ success: true, data: userNotifs });
-});
-app.post('/api/users/:id/notifications/:notifId/read', (req, res) => {
-  const notif = notifications.find(n => n.id === req.params.notifId && n.userId === req.params.id);
-  if (notif) notif.read = true;
-  res.json({ success: true, data: notif });
-});
-
-// --- Reporting API ---
-app.post('/api/reports', (req, res) => {
-  const { reporterId, targetId, targetType, reason } = req.body;
-  const newReport = { id: `rep_${Date.now()}`, reporterId, targetId, targetType, reason, status: 'pending', createdAt: Date.now() };
-  reports.push(newReport);
-  res.status(201).json({ success: true, data: newReport });
-});
-
 // --- Scripts & Reviews APIs ---
-app.get('/api/scripts', (req, res) => res.json({ success: true, data: scripts }));
+app.get('/api/scripts', (req, res) => {
+  let result = [...scripts];
+  // Basic filtering mock
+  if (req.query.tag) result = result.filter(s => s.tags.includes(req.query.tag as string));
+  if (req.query.difficulty) result = result.filter(s => s.difficulty === req.query.difficulty);
+  res.json({ success: true, data: result });
+});
 app.get('/api/scripts/:id', (req, res) => {
   const script = scripts.find(s => s.id === req.params.id);
   script ? res.json({ success: true, data: script }) : res.status(404).json({ success: false, message: 'Script not found' });
@@ -108,7 +63,7 @@ app.post('/api/scripts/:id/reviews', (req, res) => {
   res.status(201).json({ success: true, data: newReview });
 });
 
-// --- User Profile, Social & Inventory APIs ---
+// --- User Profile, Social, Messages & Inventory APIs ---
 app.get('/api/users/:id', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if(user) {
@@ -127,15 +82,11 @@ app.put('/api/users/:id', (req, res) => {
   const { password: _, ...safeUser } = user;
   res.json({ success: true, data: safeUser });
 });
-app.post('/api/users/:id/favorites', (req, res) => {
+app.get('/api/users/:id/achievements', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  if (user && req.body.scriptId && !user.favorites.includes(req.body.scriptId)) user.favorites.push(req.body.scriptId);
-  res.json({ success: true, data: user?.favorites });
-});
-app.delete('/api/users/:id/favorites/:scriptId', (req, res) => {
-  const user = users.find(u => u.id === req.params.id);
-  if (user) user.favorites = user.favorites.filter(id => id !== req.params.scriptId);
-  res.json({ success: true, data: user?.favorites });
+  if (!user) return res.status(404).json({ success: false });
+  const userAchvs = user.achievements.map(aid => achievements.find(a => a.id === aid)).filter(Boolean);
+  res.json({ success: true, data: userAchvs });
 });
 app.get('/api/users/:id/friends', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
@@ -151,6 +102,30 @@ app.post('/api/users/:id/friends/:friendId', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if (user && !user.friends.includes(req.params.friendId)) user.friends.push(req.params.friendId);
   res.json({ success: true, data: user?.friends });
+});
+// Direct Messaging
+app.get('/api/users/:id/messages/:friendId', (req, res) => {
+  const chatKey = getChatKey(req.params.id, req.params.friendId);
+  const msgs = directMessages[chatKey] || [];
+  res.json({ success: true, data: msgs });
+});
+app.post('/api/users/:id/messages/:friendId', (req, res) => {
+  const chatKey = getChatKey(req.params.id, req.params.friendId);
+  if (!directMessages[chatKey]) directMessages[chatKey] = [];
+  const msg = { id: `dm_${Date.now()}`, senderId: req.params.id, text: req.body.text, timestamp: Date.now() };
+  directMessages[chatKey].push(msg);
+  res.status(201).json({ success: true, data: msg });
+});
+
+app.post('/api/users/:id/favorites', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  if (user && req.body.scriptId && !user.favorites.includes(req.body.scriptId)) user.favorites.push(req.body.scriptId);
+  res.json({ success: true, data: user?.favorites });
+});
+app.delete('/api/users/:id/favorites/:scriptId', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  if (user) user.favorites = user.favorites.filter(id => id !== req.params.scriptId);
+  res.json({ success: true, data: user?.favorites });
 });
 app.post('/api/users/:id/inventory', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
@@ -168,8 +143,27 @@ app.post('/api/users/:id/library', (req, res) => {
   }
   res.json({ success: true, data: user?.library });
 });
+app.get('/api/users/:id/notifications', (req, res) => {
+  res.json({ success: true, data: notifications.filter(n => n.userId === req.params.id) });
+});
+app.post('/api/users/:id/notifications/:notifId/read', (req, res) => {
+  const notif = notifications.find(n => n.id === req.params.notifId && n.userId === req.params.id);
+  if (notif) notif.read = true;
+  res.json({ success: true, data: notif });
+});
 
-// --- Store APIs ---
+// --- System APIs ---
+app.get('/api/leaderboard', (req, res) => {
+  const sortedUsers = [...users].sort((a, b) => b.stats.played - a.stats.played).slice(0, 10);
+  const data = sortedUsers.map(u => ({ id: u.id, name: u.name, avatar: u.avatar, played: u.stats.played, rating: u.stats.rating }));
+  res.json({ success: true, data });
+});
+app.post('/api/reports', (req, res) => {
+  const { reporterId, targetId, targetType, reason } = req.body;
+  const newReport = { id: `rep_${Date.now()}`, reporterId, targetId, targetType, reason, status: 'pending', createdAt: Date.now() };
+  reports.push(newReport);
+  res.status(201).json({ success: true, data: newReport });
+});
 app.get('/api/store/items', (req, res) => res.json({ success: true, data: storeItems }));
 
 // --- Rooms APIs ---
