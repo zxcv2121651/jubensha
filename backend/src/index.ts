@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
+import { AccessToken } from 'livekit-server-sdk';
 import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports } from './data';
 
 const app = express();
@@ -15,6 +16,40 @@ const io = new Server(server, {
 
 // --- Health Check ---
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// --- LiveKit Voice Token API ---
+// These should normally come from environment variables (.env)
+const LIVEKIT_URL = process.env.LIVEKIT_URL || 'ws://localhost:7880';
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'devkey';
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'secret';
+
+app.get('/api/rooms/:id/voice-token', (req, res) => {
+  const roomId = req.params.id;
+  const userId = req.query.userId as string;
+  const userName = req.query.userName as string;
+
+  if (!userId || !userName) {
+    return res.status(400).json({ success: false, message: 'Missing userId or userName' });
+  }
+
+  // Generate a token for the user to join the specific LiveKit room
+  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+    identity: userId,
+    name: userName,
+  });
+
+  // Grant permissions
+  at.addGrant({
+    roomJoin: true,
+    room: roomId,
+    canPublish: true,
+    canSubscribe: true,
+  });
+
+  const token = at.toJwt();
+  res.json({ success: true, data: { token, url: LIVEKIT_URL } });
+});
+
 
 // --- Auth APIs ---
 app.post('/api/auth/login', (req, res) => {
