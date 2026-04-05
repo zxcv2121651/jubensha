@@ -20,11 +20,11 @@ export const users = [
   {
     id: 'user_1', username: 'admin', password: 'password123', name: '剧本杀老司机', bio: '推理无情，沉浸有爱。', avatar: 'https://picsum.photos/seed/u1/150/150', stats: { played: 42, favorites: 15, reviews: 8, rating: 4.9 },
     history: [{ id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队' }],
-    favorites: ['1', '2'], friends: ['user_2'], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000 // In-app currency
+    favorites: ['1', '2'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000
   },
   {
     id: 'user_2', username: 'testuser', password: 'password123', name: '推理小白', bio: '努力学习中', avatar: 'https://picsum.photos/seed/u2/150/150', stats: { played: 5, favorites: 2, reviews: 1, rating: 4.2 },
-    history: [], favorites: [], friends: ['user_1'], inventory: [], library: [], achievements: ['ach_1'], balance: 50
+    history: [], favorites: [], friends: ['user_1'], blacklist: ['user_3'], inventory: [], library: [], achievements: ['ach_1'], balance: 50
   }
 ];
 
@@ -45,10 +45,11 @@ export const roomStates: Record<string, any> = {
   'room_1': { currentAct: 'act_1', revealedClues: ['clue_1', 'clue_2'], chatLog: [{ id: 'msg1', userId: 'user_1', text: '大家好！', timestamp: Date.now(), isPrivate: false }], roleAssignments: {}, votes: {}, isPaused: false }
 };
 
+export const gameResults: Record<string, any> = {};
+
 export const storeItems = [
   { id: 'item_1', name: '大侦探头像框', type: 'avatar_frame', price: 100 },
   { id: 'item_2', name: '血迹气泡', type: 'chat_bubble', price: 200 }
 ];
 
-// Matchmaking queues: Record of scriptId -> array of userIds waiting
 export const matchmakingQueues: Record<string, string[]> = {};
