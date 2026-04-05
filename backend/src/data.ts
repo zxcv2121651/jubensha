@@ -16,15 +16,22 @@ export const achievements = [
   { id: 'ach_2', name: '推理大师', description: '成功指认凶手10次', icon: '🔍' }
 ];
 
-export const users = [
+export const quests = [
+  { id: 'q_1', title: '每日首胜', reward: 50, isClaimed: false },
+  { id: 'q_2', title: '结交新友', reward: 20, isClaimed: false }
+];
+
+export const users: any[] = [
   {
     id: 'user_1', username: 'admin', password: 'password123', name: '剧本杀老司机', bio: '推理无情，沉浸有爱。', avatar: 'https://picsum.photos/seed/u1/150/150', stats: { played: 42, favorites: 15, reviews: 8, rating: 4.9 },
     history: [{ id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队' }],
-    favorites: ['1', '2'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000
+    favorites: ['1', '2'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000,
+    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests))
   },
   {
     id: 'user_2', username: 'testuser', password: 'password123', name: '推理小白', bio: '努力学习中', avatar: 'https://picsum.photos/seed/u2/150/150', stats: { played: 5, favorites: 2, reviews: 1, rating: 4.2 },
-    history: [], favorites: [], friends: ['user_1'], blacklist: ['user_3'], inventory: [], library: [], achievements: ['ach_1'], balance: 50
+    history: [], favorites: [], friends: ['user_1'], blacklist: ['user_3'], inventory: [], library: [], achievements: ['ach_1'], balance: 50,
+    isVip: true, vipExpiry: Date.now() + 86400000 * 30, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests))
   }
 ];
 
@@ -47,9 +54,22 @@ export const roomStates: Record<string, any> = {
 
 export const gameResults: Record<string, any> = {};
 
+export const gameReplays: Record<string, any> = {
+  'room_history_1': {
+    roomId: 'room_history_1',
+    scriptId: '1',
+    events: [
+      { timestamp: 1633000000, type: 'start', description: '游戏开始' },
+      { timestamp: 1633000500, type: 'clue', description: 'DM公开线索：带血的匕首' },
+      { timestamp: 1633004000, type: 'vote', description: '玩家一指认玩家二' }
+    ]
+  }
+};
+
 export const storeItems = [
   { id: 'item_1', name: '大侦探头像框', type: 'avatar_frame', price: 100 },
-  { id: 'item_2', name: '血迹气泡', type: 'chat_bubble', price: 200 }
+  { id: 'item_2', name: '血迹气泡', type: 'chat_bubble', price: 200 },
+  { id: 'vip_1', name: '月度大会员', type: 'subscription', price: 300 }
 ];
 
 export const matchmakingQueues: Record<string, string[]> = {};

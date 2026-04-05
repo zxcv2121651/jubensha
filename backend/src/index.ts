@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
-import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages, matchmakingQueues, gameResults } from './data';
+import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages, matchmakingQueues, gameResults, gameReplays } from './data';
 
 const app = express();
 app.use(cors());
@@ -17,9 +17,7 @@ const getChatKey = (id1: string, id2: string) => [id1, id2].sort().join('_');
 
 // --- Health Check & File Upload ---
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-app.post('/api/upload', (req, res) => {
-  res.json({ success: true, data: { url: `https://picsum.photos/seed/${Date.now()}/400/400` } });
-});
+app.post('/api/upload', (req, res) => res.json({ success: true, data: { url: `https://picsum.photos/seed/${Date.now()}/400/400` } }));
 
 // --- Global Search API ---
 app.get('/api/search', (req, res) => {
@@ -38,10 +36,7 @@ app.get('/api/search', (req, res) => {
 
 // --- AI Hint Mock ---
 app.post('/api/ai/hint', (req, res) => {
-  const { roomId, userId, context } = req.body;
-  setTimeout(() => {
-    res.json({ success: true, data: { text: "从目前的线索来看，死者身上的刀伤方向很奇怪，你可以再多调查一下当晚谁去过后院。" }});
-  }, 1000);
+  setTimeout(() => res.json({ success: true, data: { text: "从目前的线索来看，死者身上的刀伤方向很奇怪，你可以再多调查一下当晚谁去过后院。" }}), 1000);
 });
 
 // --- Auth APIs ---
@@ -62,14 +57,15 @@ app.post('/api/auth/register', (req, res) => {
   }
   const newUser = {
     id: `user_${Date.now()}`, username, password, name: name || username, bio: '', avatar: 'https://picsum.photos/seed/new/150/150',
-    stats: { played: 0, favorites: 0, reviews: 0, rating: 0 }, history: [], favorites: [], friends: [], blacklist: [], inventory: [], library: [], achievements: [], balance: 0
+    stats: { played: 0, favorites: 0, reviews: 0, rating: 0 }, history: [], favorites: [], friends: [], blacklist: [], inventory: [], library: [], achievements: [], balance: 0,
+    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: [ { id: 'q_1', title: '每日首胜', reward: 50, isClaimed: false }, { id: 'q_2', title: '结交新友', reward: 20, isClaimed: false } ]
   };
   users.push(newUser);
   const { password: _, ...safeUser } = newUser;
   res.status(201).json({ success: true, data: { token: `fake-jwt-token-${newUser.id}`, user: safeUser } });
 });
 
-// --- Wallet API ---
+// --- Wallet & Subscriptions ---
 app.post('/api/wallet/topup', (req, res) => {
   const { userId, amount } = req.body;
   const user = users.find(u => u.id === userId);
@@ -77,6 +73,35 @@ app.post('/api/wallet/topup', (req, res) => {
   user.balance += amount;
   res.json({ success: true, data: { balance: user.balance } });
 });
+app.post('/api/users/:id/subscription', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  const { planId } = req.body; // e.g., 'vip_1'
+  const plan = storeItems.find(i => i.id === planId);
+  if (!user || !plan) return res.status(404).json({ success: false, message: 'User or Plan not found' });
+  if (user.balance < plan.price) return res.status(400).json({ success: false, message: 'Insufficient balance' });
+
+  user.balance -= plan.price;
+  user.isVip = true;
+  user.vipExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
+  res.json({ success: true, data: { isVip: user.isVip, vipExpiry: user.vipExpiry, balance: user.balance } });
+});
+
+// --- Quests APIs ---
+app.get('/api/users/:id/quests', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  user ? res.json({ success: true, data: user.quests }) : res.status(404).json({ success: false, message: 'User not found' });
+});
+app.post('/api/users/:id/quests/:questId/claim', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+  const quest = user.quests.find((q:any) => q.id === req.params.questId);
+  if (!quest || quest.isClaimed) return res.status(400).json({ success: false, message: 'Invalid or already claimed quest' });
+
+  quest.isClaimed = true;
+  user.balance += quest.reward;
+  res.json({ success: true, data: { quests: user.quests, balance: user.balance } });
+});
+
 
 // --- Scripts & Reviews APIs ---
 app.get('/api/scripts', (req, res) => {
@@ -89,11 +114,38 @@ app.get('/api/scripts/:id', (req, res) => {
   const script = scripts.find(s => s.id === req.params.id);
   script ? res.json({ success: true, data: script }) : res.status(404).json({ success: false, message: 'Script not found' });
 });
+app.post('/api/scripts', (req, res) => {
+  // UGC Script upload
+  const { title, tags, players, duration, difficulty, description, roles, authorId } = req.body;
+  const newScript = {
+    id: `script_${Date.now()}`, title, tags: tags || [], players: players || { male:0, female:0, any:0 },
+    duration: duration || '未知', difficulty: difficulty || '新手', description: description || '',
+    rating: 0, roles: roles || [], isUgc: true, authorId
+  };
+  scripts.push(newScript);
+  res.status(201).json({ success: true, data: newScript });
+});
 app.get('/api/scripts/:id/reviews', (req, res) => res.json({ success: true, data: reviews.filter(r => r.scriptId === req.params.id) }));
 app.post('/api/scripts/:id/reviews', (req, res) => {
   const newReview = { id: `r_${Date.now()}`, scriptId: req.params.id, date: new Date().toISOString().split('T')[0], ...req.body };
   reviews.push(newReview);
   res.status(201).json({ success: true, data: newReview });
+});
+
+// --- DM Tipping API ---
+app.post('/api/users/:id/tip', (req, res) => {
+  const targetDM = users.find(u => u.id === req.params.id);
+  const { senderId, amount } = req.body;
+  const sender = users.find(u => u.id === senderId);
+
+  if (!sender || !targetDM) return res.status(404).json({ success: false, message: 'User not found' });
+  if (sender.balance < amount || amount <= 0) return res.status(400).json({ success: false, message: 'Invalid or insufficient balance' });
+
+  sender.balance -= amount;
+  targetDM.balance += amount; // The tip goes to their balance
+  targetDM.dmTipsReceived += amount;
+
+  res.json({ success: true, data: { senderBalance: sender.balance } });
 });
 
 // --- User Profile, Social, Messages, Blacklist & Inventory APIs ---
@@ -118,13 +170,13 @@ app.put('/api/users/:id', (req, res) => {
 app.get('/api/users/:id/achievements', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if (!user) return res.status(404).json({ success: false });
-  const userAchvs = user.achievements.map(aid => achievements.find(a => a.id === aid)).filter(Boolean);
+  const userAchvs = user.achievements.map((aid:string) => achievements.find(a => a.id === aid)).filter(Boolean);
   res.json({ success: true, data: userAchvs });
 });
 app.get('/api/users/:id/friends', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-  const friendsData = user.friends.map(fid => {
+  const friendsData = user.friends.map((fid:string) => {
     const f = users.find(u => u.id === fid);
     if(f) { const { password: _, ...sf } = f; return sf; }
     return null;
@@ -133,7 +185,7 @@ app.get('/api/users/:id/friends', (req, res) => {
 });
 app.post('/api/users/:id/friends/:friendId', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  if (user && !(user.friends as string[]).includes(req.params.friendId)) (user.friends as string[]).push(req.params.friendId);
+  if (user && !user.friends.includes(req.params.friendId)) user.friends.push(req.params.friendId);
   res.json({ success: true, data: user?.friends });
 });
 app.get('/api/users/:id/blacklist', (req, res) => {
@@ -142,12 +194,12 @@ app.get('/api/users/:id/blacklist', (req, res) => {
 });
 app.post('/api/users/:id/blacklist/:targetId', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  if (user && !(user.blacklist as string[]).includes(req.params.targetId)) (user.blacklist as string[]).push(req.params.targetId);
+  if (user && !user.blacklist.includes(req.params.targetId)) user.blacklist.push(req.params.targetId);
   res.json({ success: true, data: user?.blacklist });
 });
 app.delete('/api/users/:id/blacklist/:targetId', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  if (user) user.blacklist = (user.blacklist as string[]).filter(id => id !== req.params.targetId);
+  if (user) user.blacklist = user.blacklist.filter((id:string) => id !== req.params.targetId);
   res.json({ success: true, data: user?.blacklist });
 });
 
@@ -167,28 +219,24 @@ app.post('/api/users/:id/messages/:friendId', (req, res) => {
 
 app.post('/api/users/:id/favorites', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  if (user && req.body.scriptId && !(user.favorites as string[]).includes(req.body.scriptId)) (user.favorites as string[]).push(req.body.scriptId);
+  if (user && req.body.scriptId && !user.favorites.includes(req.body.scriptId)) user.favorites.push(req.body.scriptId);
   res.json({ success: true, data: user?.favorites });
 });
 app.delete('/api/users/:id/favorites/:scriptId', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  if (user) user.favorites = (user.favorites as string[]).filter(id => id !== req.params.scriptId);
+  if (user) user.favorites = user.favorites.filter((id:string) => id !== req.params.scriptId);
   res.json({ success: true, data: user?.favorites });
 });
 app.post('/api/users/:id/inventory', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   const item = storeItems.find(i => i.id === req.body.itemId);
-  if (user && item && !(user.inventory as string[]).includes(item.id)) {
-    (user.inventory as string[]).push(item.id);
-  }
+  if (user && item && !user.inventory.includes(item.id)) user.inventory.push(item.id);
   res.json({ success: true, data: user?.inventory });
 });
 app.post('/api/users/:id/library', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   const script = scripts.find(s => s.id === req.body.scriptId);
-  if (user && script && !(user.library as string[]).includes(script.id)) {
-    (user.library as string[]).push(script.id);
-  }
+  if (user && script && !user.library.includes(script.id)) user.library.push(script.id);
   res.json({ success: true, data: user?.library });
 });
 app.get('/api/users/:id/notifications', (req, res) => {
@@ -221,25 +269,19 @@ app.post('/api/store/buy', (req, res) => {
   if (user.balance < item.price) return res.status(400).json({ success: false, message: 'Insufficient balance' });
 
   user.balance -= item.price;
-  if (!(user.inventory as string[]).includes(item.id)) {
-    (user.inventory as string[]).push(item.id);
-  }
+  if (!user.inventory.includes(item.id)) user.inventory.push(item.id);
   res.json({ success: true, data: { balance: user.balance, inventory: user.inventory } });
 });
 
 app.post('/api/matchmaking/join', (req, res) => {
   const { userId, scriptId } = req.body;
   if (!matchmakingQueues[scriptId]) matchmakingQueues[scriptId] = [];
-  if (!matchmakingQueues[scriptId].includes(userId)) {
-    matchmakingQueues[scriptId].push(userId);
-  }
+  if (!matchmakingQueues[scriptId].includes(userId)) matchmakingQueues[scriptId].push(userId);
   res.json({ success: true, data: { queueLength: matchmakingQueues[scriptId].length } });
 });
 app.post('/api/matchmaking/leave', (req, res) => {
   const { userId, scriptId } = req.body;
-  if (matchmakingQueues[scriptId]) {
-    matchmakingQueues[scriptId] = matchmakingQueues[scriptId].filter(id => id !== userId);
-  }
+  if (matchmakingQueues[scriptId]) matchmakingQueues[scriptId] = matchmakingQueues[scriptId].filter(id => id !== userId);
   res.json({ success: true });
 });
 app.get('/api/matchmaking/status', (req, res) => {
@@ -272,15 +314,10 @@ app.post('/api/rooms/:id/join', (req, res) => {
   const room = rooms.find(r => r.id === req.params.id);
   if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
   if (room.password && room.password !== req.body.password) return res.status(401).json({ success: false, message: 'Invalid password' });
-
-  // Blacklist check
   if (req.body.userId) {
      const user = users.find(u=>u.id===req.body.userId);
-     if (user && room.players.some(p => (user.blacklist as string[]).includes(p))) {
-        return res.status(403).json({ success: false, message: 'Cannot join room with blacklisted users' });
-     }
+     if (user && room.players.some(p => user.blacklist.includes(p))) return res.status(403).json({ success: false, message: 'Cannot join room with blacklisted users' });
   }
-
   if (req.body.userId && !room.players.includes(req.body.userId) && room.currentPlayers < room.targetPlayers) {
     room.players.push(req.body.userId);
     room.currentPlayers++;
@@ -298,12 +335,11 @@ app.post('/api/rooms/:id/leave', (req, res) => {
   res.json({ success: true, data: room });
 });
 
-// Game Results
+// Game Results & Replays
 app.post('/api/rooms/:id/result', (req, res) => {
   const { mvpId, winningFaction, summary } = req.body;
   const result = { roomId: req.params.id, mvpId, winningFaction, summary, timestamp: Date.now() };
   gameResults[req.params.id] = result;
-
   const room = rooms.find(r=>r.id===req.params.id);
   if(room) {
     room.players.forEach(pid => {
@@ -311,12 +347,15 @@ app.post('/api/rooms/:id/result', (req, res) => {
       if(u) u.stats.played++;
     });
   }
-
   res.json({ success: true, data: result });
 });
 app.get('/api/rooms/:id/result', (req, res) => {
   const result = gameResults[req.params.id];
   result ? res.json({ success: true, data: result }) : res.status(404).json({ success: false });
+});
+app.get('/api/rooms/:id/replay', (req, res) => {
+  const replay = gameReplays[req.params.id];
+  replay ? res.json({ success: true, data: replay }) : res.status(404).json({ success: false, message: 'Replay not found' });
 });
 
 
