@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
-import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages, matchmakingQueues, gameResults, gameReplays } from './data';
+import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages, matchmakingQueues, gameResults, gameReplays, clubs, gachaPool } from './data';
 
 const app = express();
 app.use(cors());
@@ -58,7 +58,7 @@ app.post('/api/auth/register', (req, res) => {
   const newUser = {
     id: `user_${Date.now()}`, username, password, name: name || username, bio: '', avatar: 'https://picsum.photos/seed/new/150/150',
     stats: { played: 0, favorites: 0, reviews: 0, rating: 0 }, history: [], favorites: [], friends: [], blacklist: [], inventory: [], library: [], achievements: [], balance: 0,
-    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: [ { id: 'q_1', title: '每日首胜', reward: 50, isClaimed: false }, { id: 'q_2', title: '结交新友', reward: 20, isClaimed: false } ]
+    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: [ { id: 'q_1', title: '每日首胜', reward: 50, isClaimed: false }, { id: 'q_2', title: '结交新友', reward: 20, isClaimed: false } ], clubId: null
   };
   users.push(newUser);
   const { password: _, ...safeUser } = newUser;
@@ -127,9 +127,18 @@ app.post('/api/scripts', (req, res) => {
 });
 app.get('/api/scripts/:id/reviews', (req, res) => res.json({ success: true, data: reviews.filter(r => r.scriptId === req.params.id) }));
 app.post('/api/scripts/:id/reviews', (req, res) => {
-  const newReview = { id: `r_${Date.now()}`, scriptId: req.params.id, date: new Date().toISOString().split('T')[0], ...req.body };
+  const newReview = { id: `r_${Date.now()}`, scriptId: req.params.id, date: new Date().toISOString().split('T')[0], likes: 0, ...req.body };
   reviews.push(newReview);
   res.status(201).json({ success: true, data: newReview });
+});
+app.post('/api/scripts/:id/reviews/:reviewId/like', (req, res) => {
+  const review = reviews.find(r => r.id === req.params.reviewId);
+  if (review) {
+    review.likes += 1;
+    res.json({ success: true, data: review });
+  } else {
+    res.status(404).json({ success: false, message: 'Review not found' });
+  }
 });
 
 // --- DM Tipping API ---
@@ -142,7 +151,7 @@ app.post('/api/users/:id/tip', (req, res) => {
   if (sender.balance < amount || amount <= 0) return res.status(400).json({ success: false, message: 'Invalid or insufficient balance' });
 
   sender.balance -= amount;
-  targetDM.balance += amount; // The tip goes to their balance
+  targetDM.balance += amount;
   targetDM.dmTipsReceived += amount;
 
   res.json({ success: true, data: { senderBalance: sender.balance } });
@@ -273,15 +282,78 @@ app.post('/api/store/buy', (req, res) => {
   res.json({ success: true, data: { balance: user.balance, inventory: user.inventory } });
 });
 
+// Gacha/Lootbox logic
+app.post('/api/store/gacha', (req, res) => {
+  const { userId } = req.body;
+  const user = users.find(u => u.id === userId);
+  const GACHA_COST = 150;
+
+  if (!user || user.balance < GACHA_COST) {
+    return res.status(400).json({ success: false, message: 'Insufficient balance or user not found' });
+  }
+
+  user.balance -= GACHA_COST;
+  // Simple weighted random logic
+  const rand = Math.random();
+  let cumulative = 0;
+  let wonItem = gachaPool[gachaPool.length - 1]; // default fallback
+
+  for (const item of gachaPool) {
+    cumulative += item.dropRate;
+    if (rand <= cumulative) { wonItem = item; break; }
+  }
+
+  if (!user.inventory.includes(wonItem.id)) user.inventory.push(wonItem.id);
+  res.json({ success: true, data: { wonItem, balance: user.balance, inventory: user.inventory } });
+});
+
+// Clubs
+app.get('/api/clubs', (req, res) => {
+  res.json({ success: true, data: clubs });
+});
+app.post('/api/clubs', (req, res) => {
+  const { name, description, leaderId } = req.body;
+  const newClub = { id: `club_${Date.now()}`, name, description, leaderId, members: [leaderId] };
+  clubs.push(newClub);
+  const user = users.find(u => u.id === leaderId);
+  if (user) user.clubId = newClub.id;
+  res.status(201).json({ success: true, data: newClub });
+});
+app.post('/api/clubs/:id/join', (req, res) => {
+  const club = clubs.find(c => c.id === req.params.id);
+  const { userId } = req.body;
+  const user = users.find(u => u.id === userId);
+
+  if (!club || !user) return res.status(404).json({ success: false });
+  if (!club.members.includes(userId)) club.members.push(userId);
+  user.clubId = club.id;
+
+  res.json({ success: true, data: club });
+});
+
+// DM Analytics
+app.get('/api/analytics/dm/:userId', (req, res) => {
+  const user = users.find(u => u.id === req.params.userId);
+  if (!user) return res.status(404).json({ success: false });
+
+  const dmGamesHosted = rooms.filter(r => r.host === req.params.userId && r.status === 'finished').length;
+  // Mocking advanced analytics
+  res.json({ success: true, data: { gamesHosted: dmGamesHosted, averageRating: user.stats.rating, tipsEarned: user.dmTipsReceived } });
+});
+
 app.post('/api/matchmaking/join', (req, res) => {
   const { userId, scriptId } = req.body;
   if (!matchmakingQueues[scriptId]) matchmakingQueues[scriptId] = [];
-  if (!matchmakingQueues[scriptId].includes(userId)) matchmakingQueues[scriptId].push(userId);
+  if (!matchmakingQueues[scriptId].includes(userId)) {
+    matchmakingQueues[scriptId].push(userId);
+  }
   res.json({ success: true, data: { queueLength: matchmakingQueues[scriptId].length } });
 });
 app.post('/api/matchmaking/leave', (req, res) => {
   const { userId, scriptId } = req.body;
-  if (matchmakingQueues[scriptId]) matchmakingQueues[scriptId] = matchmakingQueues[scriptId].filter(id => id !== userId);
+  if (matchmakingQueues[scriptId]) {
+    matchmakingQueues[scriptId] = matchmakingQueues[scriptId].filter(id => id !== userId);
+  }
   res.json({ success: true });
 });
 app.get('/api/matchmaking/status', (req, res) => {
@@ -314,10 +386,14 @@ app.post('/api/rooms/:id/join', (req, res) => {
   const room = rooms.find(r => r.id === req.params.id);
   if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
   if (room.password && room.password !== req.body.password) return res.status(401).json({ success: false, message: 'Invalid password' });
+
   if (req.body.userId) {
      const user = users.find(u=>u.id===req.body.userId);
-     if (user && room.players.some(p => user.blacklist.includes(p))) return res.status(403).json({ success: false, message: 'Cannot join room with blacklisted users' });
+     if (user && room.players.some(p => user.blacklist.includes(p))) {
+        return res.status(403).json({ success: false, message: 'Cannot join room with blacklisted users' });
+     }
   }
+
   if (req.body.userId && !room.players.includes(req.body.userId) && room.currentPlayers < room.targetPlayers) {
     room.players.push(req.body.userId);
     room.currentPlayers++;
@@ -340,6 +416,7 @@ app.post('/api/rooms/:id/result', (req, res) => {
   const { mvpId, winningFaction, summary } = req.body;
   const result = { roomId: req.params.id, mvpId, winningFaction, summary, timestamp: Date.now() };
   gameResults[req.params.id] = result;
+
   const room = rooms.find(r=>r.id===req.params.id);
   if(room) {
     room.players.forEach(pid => {
@@ -347,6 +424,7 @@ app.post('/api/rooms/:id/result', (req, res) => {
       if(u) u.stats.played++;
     });
   }
+
   res.json({ success: true, data: result });
 });
 app.get('/api/rooms/:id/result', (req, res) => {

@@ -3,8 +3,8 @@ export const scripts = [
   { id: '2', title: '长安夜行', tags: ['古风', '推理', '武侠', '悬疑'], players: { male: 4, female: 2, any: 1 }, duration: '5-6小时', difficulty: '烧脑', description: '天宝十四载...', rating: 9.5, roles: [] }
 ];
 
-export const reviews = [
-  { id: 'r1', scriptId: '1', user: '剧本杀老司机', userId: 'user_1', rating: 5, content: '强推！', date: '2023-10-01' }
+export const reviews: any[] = [
+  { id: 'r1', scriptId: '1', user: '剧本杀老司机', userId: 'user_1', rating: 5, content: '强推！', date: '2023-10-01', likes: 10 }
 ];
 
 export const rooms = [
@@ -26,13 +26,17 @@ export const users: any[] = [
     id: 'user_1', username: 'admin', password: 'password123', name: '剧本杀老司机', bio: '推理无情，沉浸有爱。', avatar: 'https://picsum.photos/seed/u1/150/150', stats: { played: 42, favorites: 15, reviews: 8, rating: 4.9 },
     history: [{ id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队' }],
     favorites: ['1', '2'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000,
-    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests))
+    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: 'club_1'
   },
   {
     id: 'user_2', username: 'testuser', password: 'password123', name: '推理小白', bio: '努力学习中', avatar: 'https://picsum.photos/seed/u2/150/150', stats: { played: 5, favorites: 2, reviews: 1, rating: 4.2 },
     history: [], favorites: [], friends: ['user_1'], blacklist: ['user_3'], inventory: [], library: [], achievements: ['ach_1'], balance: 50,
-    isVip: true, vipExpiry: Date.now() + 86400000 * 30, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests))
+    isVip: true, vipExpiry: Date.now() + 86400000 * 30, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: null
   }
+];
+
+export const clubs: any[] = [
+  { id: 'club_1', name: '午夜推理社', description: '全是硬核老粉', leaderId: 'user_1', members: ['user_1'] }
 ];
 
 export const directMessages: Record<string, any[]> = {
@@ -70,6 +74,13 @@ export const storeItems = [
   { id: 'item_1', name: '大侦探头像框', type: 'avatar_frame', price: 100 },
   { id: 'item_2', name: '血迹气泡', type: 'chat_bubble', price: 200 },
   { id: 'vip_1', name: '月度大会员', type: 'subscription', price: 300 }
+];
+
+// Gacha Pool (Items you can win from blind boxes)
+export const gachaPool = [
+  { id: 'gacha_1', name: '传说级入场动画 - 龙', dropRate: 0.05 },
+  { id: 'gacha_2', name: '史诗级头像框 - 金', dropRate: 0.15 },
+  { id: 'gacha_3', name: '普通改名卡', dropRate: 0.80 }
 ];
 
 export const matchmakingQueues: Record<string, string[]> = {};
