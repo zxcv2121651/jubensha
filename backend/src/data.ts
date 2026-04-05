@@ -1,6 +1,10 @@
 export const scripts = [
-  { id: '1', title: '良辰吉日', tags: ['民国', '情感', '阵营', '悬疑'], players: { male: 3, female: 3, any: 0 }, duration: '4-5小时', difficulty: '进阶', description: '民国二十六年...', rating: 9.2, roles: [{ id: 'c1', name: '林少爷', gender: 'male' }, { id: 'c2', name: '苏小姐', gender: 'female' }] },
-  { id: '2', title: '长安夜行', tags: ['古风', '推理', '武侠', '悬疑'], players: { male: 4, female: 2, any: 1 }, duration: '5-6小时', difficulty: '烧脑', description: '天宝十四载...', rating: 9.5, roles: [] }
+  {
+    id: '1', title: '良辰吉日', tags: ['民国', '情感', '阵营', '悬疑'], players: { male: 3, female: 3, any: 0 }, duration: '4-5小时', difficulty: '进阶', description: '民国二十六年...', rating: 9.2,
+    roles: [{ id: 'c1', name: '林少爷', gender: 'male' }, { id: 'c2', name: '苏小姐', gender: 'female' }],
+    acts: { 'act_1': { title: '第一幕', content: '那是一个下雨的夜晚...' }, 'act_2': { title: '第二幕', content: '尸体被发现了...' } }
+  },
+  { id: '2', title: '长安夜行', tags: ['古风', '推理', '武侠', '悬疑'], players: { male: 4, female: 2, any: 1 }, duration: '5-6小时', difficulty: '烧脑', description: '天宝十四载...', rating: 9.5, roles: [], acts: {} }
 ];
 
 export const reviews: any[] = [
@@ -24,7 +28,7 @@ export const quests = [
 export const users: any[] = [
   {
     id: 'user_1', username: 'admin', password: 'password123', name: '剧本杀老司机', bio: '推理无情，沉浸有爱。', avatar: 'https://picsum.photos/seed/u1/150/150', stats: { played: 42, favorites: 15, reviews: 8, rating: 4.9 },
-    history: [{ id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队' }],
+    history: [{ id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队', resultSummary: '成功推凶' }],
     favorites: ['1', '2'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000,
     isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: 'club_1',
     wishlist: ['2'], checkinStreak: 5, lastCheckin: Date.now() - 86400000 // yesterday
@@ -58,10 +62,8 @@ export const roomStates: Record<string, any> = {
   'room_1': {
      currentAct: 'act_1', revealedClues: ['clue_1', 'clue_2'], chatLog: [{ id: 'msg1', userId: 'user_1', text: '大家好！', timestamp: Date.now(), isPrivate: false }],
      roleAssignments: {}, votes: {}, isPaused: false,
-     playerInventories: { // For in-game item trading (机制本)
-       'user_1': ['clue_1', 'gold_coin'],
-       'user_2': ['silver_key']
-     }
+     playerInventories: { 'user_1': ['clue_1', 'gold_coin'], 'user_2': ['silver_key'] },
+     readyStatus: { 'user_1': true, 'user_2': false, 'user_3': false, 'user_4': false }
   }
 };
 
@@ -76,6 +78,10 @@ export const storeItems = [
   { id: 'item_2', name: '血迹气泡', type: 'chat_bubble', price: 200 },
   { id: 'vip_1', name: '月度大会员', type: 'subscription', price: 300 }
 ];
+
+export const promoCodes: Record<string, any> = {
+  'WELCOME2024': { reward: 500, type: 'balance', usedBy: [] }
+};
 
 export const gachaPool = [
   { id: 'gacha_1', name: '传说级入场动画 - 龙', dropRate: 0.05 },

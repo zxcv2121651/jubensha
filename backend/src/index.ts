@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
-import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages, matchmakingQueues, gameResults, gameReplays, clubs, gachaPool } from './data';
+import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages, matchmakingQueues, gameResults, gameReplays, clubs, gachaPool, promoCodes } from './data';
 
 const app = express();
 app.use(cors());
@@ -66,7 +66,7 @@ app.post('/api/auth/register', (req, res) => {
   res.status(201).json({ success: true, data: { token: `fake-jwt-token-${newUser.id}`, user: safeUser } });
 });
 
-// --- Wallet & Subscriptions ---
+// --- Wallet, Promo Codes & Subscriptions ---
 app.post('/api/wallet/topup', (req, res) => {
   const { userId, amount } = req.body;
   const user = users.find(u => u.id === userId);
@@ -74,16 +74,27 @@ app.post('/api/wallet/topup', (req, res) => {
   user.balance += amount;
   res.json({ success: true, data: { balance: user.balance } });
 });
+app.post('/api/store/redeem', (req, res) => {
+  const { userId, code } = req.body;
+  const user = users.find(u => u.id === userId);
+  const promo = promoCodes[code];
+  if (!user || !promo) return res.status(400).json({ success: false, message: 'Invalid promo code' });
+  if (promo.usedBy.includes(userId)) return res.status(400).json({ success: false, message: 'Code already used' });
+
+  if (promo.type === 'balance') user.balance += promo.reward;
+  promo.usedBy.push(userId);
+  res.json({ success: true, data: { balance: user.balance, reward: promo.reward } });
+});
 app.post('/api/users/:id/subscription', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  const { planId } = req.body; // e.g., 'vip_1'
+  const { planId } = req.body;
   const plan = storeItems.find(i => i.id === planId);
   if (!user || !plan) return res.status(404).json({ success: false, message: 'User or Plan not found' });
   if (user.balance < plan.price) return res.status(400).json({ success: false, message: 'Insufficient balance' });
 
   user.balance -= plan.price;
   user.isVip = true;
-  user.vipExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
+  user.vipExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
   res.json({ success: true, data: { isVip: user.isVip, vipExpiry: user.vipExpiry, balance: user.balance } });
 });
 
@@ -109,15 +120,12 @@ app.post('/api/users/:id/checkin', (req, res) => {
   const now = Date.now();
   const ONE_DAY = 86400000;
 
-  // Very basic mock logic for daily streak
   if (now - user.lastCheckin < ONE_DAY) {
      return res.status(400).json({ success: false, message: 'Already checked in today' });
   }
-
   user.checkinStreak = (now - user.lastCheckin <= ONE_DAY * 2) ? user.checkinStreak + 1 : 1;
   user.lastCheckin = now;
-  user.balance += 10 + (user.checkinStreak * 5); // Reward scaling
-
+  user.balance += 10 + (user.checkinStreak * 5);
   res.json({ success: true, data: { streak: user.checkinStreak, balance: user.balance } });
 });
 
@@ -133,12 +141,17 @@ app.get('/api/scripts/:id', (req, res) => {
   const script = scripts.find(s => s.id === req.params.id);
   script ? res.json({ success: true, data: script }) : res.status(404).json({ success: false, message: 'Script not found' });
 });
+app.get('/api/scripts/:id/act/:actId', (req, res) => {
+  const script = scripts.find(s => s.id === req.params.id);
+  if (!script || !script.acts || !(script.acts as any)[req.params.actId]) return res.status(404).json({ success: false });
+  res.json({ success: true, data: (script.acts as any)[req.params.actId] });
+});
 app.post('/api/scripts', (req, res) => {
   const { title, tags, players, duration, difficulty, description, roles, authorId } = req.body;
   const newScript = {
     id: `script_${Date.now()}`, title, tags: tags || [], players: players || { male:0, female:0, any:0 },
     duration: duration || '未知', difficulty: difficulty || '新手', description: description || '',
-    rating: 0, roles: roles || [], isUgc: true, authorId
+    rating: 0, roles: roles || [], isUgc: true, authorId, acts: {}
   };
   scripts.push(newScript);
   res.status(201).json({ success: true, data: newScript });
@@ -169,7 +182,7 @@ app.post('/api/users/:id/tip', (req, res) => {
   if (sender.balance < amount || amount <= 0) return res.status(400).json({ success: false, message: 'Invalid or insufficient balance' });
 
   sender.balance -= amount;
-  targetDM.balance += amount; // The tip goes to their balance
+  targetDM.balance += amount;
   targetDM.dmTipsReceived += amount;
 
   res.json({ success: true, data: { senderBalance: sender.balance } });
@@ -193,6 +206,12 @@ app.put('/api/users/:id', (req, res) => {
   if (req.body.avatar) user.avatar = req.body.avatar;
   const { password: _, ...safeUser } = user;
   res.json({ success: true, data: safeUser });
+});
+app.get('/api/users/:id/history/:historyId', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ success: false });
+  const h = user.history.find((h:any) => h.id === req.params.historyId);
+  h ? res.json({ success: true, data: h }) : res.status(404).json({ success: false });
 });
 app.get('/api/users/:id/achievements', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
@@ -397,8 +416,7 @@ app.post('/api/rooms', (req, res) => {
   if (!script) return res.status(404).json({ success: false, message: 'Script not found' });
   const newRoom = { id: `room_${Date.now()}`, scriptId, host, currentPlayers: 1, targetPlayers: script.players.male + script.players.female + script.players.any, status: 'waiting', players: [host], password: password || '', isPublic: isPublic ?? true };
   rooms.push(newRoom);
-  // Also init playerInventories for the host
-  roomStates[newRoom.id] = { currentAct: 'act_1', revealedClues: [], chatLog: [], roleAssignments: {}, votes: {}, isPaused: false, playerInventories: { [host]: [] } };
+  roomStates[newRoom.id] = { currentAct: 'act_1', revealedClues: [], chatLog: [], roleAssignments: {}, votes: {}, isPaused: false, playerInventories: { [host]: [] }, readyStatus: { [host]: false } };
   res.status(201).json({ success: true, data: newRoom });
 });
 app.put('/api/rooms/:id/settings', (req, res) => {
@@ -423,9 +441,9 @@ app.post('/api/rooms/:id/join', (req, res) => {
   if (req.body.userId && !room.players.includes(req.body.userId) && room.currentPlayers < room.targetPlayers) {
     room.players.push(req.body.userId);
     room.currentPlayers++;
-    // Add to playerInventories state
-    if (roomStates[room.id] && !roomStates[room.id].playerInventories[req.body.userId]) {
-      roomStates[room.id].playerInventories[req.body.userId] = [];
+    if (roomStates[room.id]) {
+      if (!roomStates[room.id].playerInventories[req.body.userId]) roomStates[room.id].playerInventories[req.body.userId] = [];
+      roomStates[room.id].readyStatus[req.body.userId] = false;
     }
     io.to(room.id).emit('playerJoined', { userId: req.body.userId, room });
   }
@@ -436,9 +454,20 @@ app.post('/api/rooms/:id/leave', (req, res) => {
   if (room && req.body.userId) {
     room.players = room.players.filter(p => p !== req.body.userId);
     room.currentPlayers = Math.max(0, room.currentPlayers - 1);
+    if(roomStates[room.id] && roomStates[room.id].readyStatus[req.body.userId] !== undefined) {
+      delete roomStates[room.id].readyStatus[req.body.userId];
+    }
     io.to(room.id).emit('playerLeft', { userId: req.body.userId, room });
   }
   res.json({ success: true, data: room });
+});
+app.post('/api/rooms/:id/ready', (req, res) => {
+  const state = roomStates[req.params.id];
+  const { userId, isReady } = req.body;
+  if (!state || !userId) return res.status(400).json({ success: false });
+  state.readyStatus[userId] = isReady;
+  io.to(req.params.id).emit('playerReadyStatusChanged', { userId, isReady });
+  res.json({ success: true, data: state.readyStatus });
 });
 
 // Game Results & Replays
@@ -491,8 +520,6 @@ app.post('/api/rooms/:id/dm/mute-all', (req, res) => {
   const { hostId, mute } = req.body;
   if (!room || room.host !== hostId) return res.status(403).json({ success: false, message: 'Unauthorized DM action' });
 
-  // In a real app this would call LiveKit Server SDK
-  // roomService.mutePublishedTrack(...)
   io.to(room.id).emit('dmMuteAll', { mute });
   res.json({ success: true, message: mute ? 'All muted' : 'All unmuted' });
 });
@@ -580,10 +607,11 @@ app.post('/api/rooms/:id/state/reset', (req, res) => {
     state.roleAssignments = {};
     state.votes = {};
     state.isPaused = false;
-    // reset inventories
     const freshInvs: any = {};
-    room.players.forEach(p => freshInvs[p] = []);
+    const freshReady: any = {};
+    room.players.forEach(p => { freshInvs[p] = []; freshReady[p] = false; });
     state.playerInventories = freshInvs;
+    state.readyStatus = freshReady;
 
     io.to(req.params.id).emit('gameReset', { state });
   }
