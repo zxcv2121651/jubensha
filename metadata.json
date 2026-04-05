@@ -1,0 +1,5 @@
+{
+  "name": "谜案寻踪 - 剧本杀",
+  "description": "中国本土化剧本杀在线组局与游玩平台",
+  "requestFramePermissions": ["microphone"]
+}
