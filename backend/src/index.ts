@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
-import { scripts, rooms, users, roomStates, reviews } from './data';
+import { scripts, rooms, users, roomStates, reviews, storeItems } from './data';
 
 const app = express();
 app.use(cors());
@@ -10,306 +10,193 @@ app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }
 });
 
 // --- Health Check ---
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend is running' });
-});
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-// --- Scripts APIs ---
-app.get('/api/scripts', (req, res) => {
-  res.json({ success: true, data: scripts });
-});
-
+// --- Scripts & Reviews APIs ---
+app.get('/api/scripts', (req, res) => res.json({ success: true, data: scripts }));
 app.get('/api/scripts/:id', (req, res) => {
   const script = scripts.find(s => s.id === req.params.id);
-  if (script) {
-    res.json({ success: true, data: script });
-  } else {
-    res.status(404).json({ success: false, message: 'Script not found' });
-  }
+  script ? res.json({ success: true, data: script }) : res.status(404).json({ success: false, message: 'Script not found' });
 });
-
-app.get('/api/scripts/:id/reviews', (req, res) => {
-  const scriptReviews = reviews.filter(r => r.scriptId === req.params.id);
-  res.json({ success: true, data: scriptReviews });
-});
-
+app.get('/api/scripts/:id/reviews', (req, res) => res.json({ success: true, data: reviews.filter(r => r.scriptId === req.params.id) }));
 app.post('/api/scripts/:id/reviews', (req, res) => {
-  const { userId, user, rating, content } = req.body;
-  if (!userId || !user || !rating || !content) {
-    return res.status(400).json({ success: false, message: 'Missing review fields' });
-  }
-
-  const newReview = {
-    id: `r_${Date.now()}`,
-    scriptId: req.params.id,
-    userId,
-    user,
-    rating,
-    content,
-    date: new Date().toISOString().split('T')[0]
-  };
-
+  const newReview = { id: `r_${Date.now()}`, scriptId: req.params.id, date: new Date().toISOString().split('T')[0], ...req.body };
   reviews.push(newReview);
   res.status(201).json({ success: true, data: newReview });
 });
 
-// --- User APIs ---
+// --- User Profile, Social & Inventory APIs ---
 app.get('/api/users/:id', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  if (user) {
-    res.json({ success: true, data: user });
-  } else {
-    res.status(404).json({ success: false, message: 'User not found' });
-  }
+  user ? res.json({ success: true, data: user }) : res.status(404).json({ success: false, message: 'User not found' });
 });
-
 app.put('/api/users/:id', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-  const { name, bio, avatar } = req.body;
-  if (name) user.name = name;
-  if (bio) user.bio = bio;
-  if (avatar) user.avatar = avatar;
-
+  Object.assign(user, req.body);
   res.json({ success: true, data: user });
 });
-
 app.post('/api/users/:id/favorites', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
-  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-  const { scriptId } = req.body;
-  if (!scriptId) return res.status(400).json({ success: false, message: 'Missing scriptId' });
-
-  if (!user.favorites.includes(scriptId)) {
-    user.favorites.push(scriptId);
-  }
-
-  res.json({ success: true, data: user.favorites });
+  if (user && req.body.scriptId && !user.favorites.includes(req.body.scriptId)) user.favorites.push(req.body.scriptId);
+  res.json({ success: true, data: user?.favorites });
 });
-
 app.delete('/api/users/:id/favorites/:scriptId', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
+  if (user) user.favorites = user.favorites.filter(id => id !== req.params.scriptId);
+  res.json({ success: true, data: user?.favorites });
+});
+app.get('/api/users/:id/friends', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-  user.favorites = user.favorites.filter(id => id !== req.params.scriptId);
-  res.json({ success: true, data: user.favorites });
+  const friendsData = user.friends.map(fid => users.find(u => u.id === fid)).filter(Boolean);
+  res.json({ success: true, data: friendsData });
+});
+app.post('/api/users/:id/friends/:friendId', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  if (user && !user.friends.includes(req.params.friendId)) user.friends.push(req.params.friendId);
+  res.json({ success: true, data: user?.friends });
+});
+app.post('/api/users/:id/inventory', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  const item = storeItems.find(i => i.id === req.body.itemId);
+  if (user && item) {
+     const inv = user.inventory as string[];
+     if (!inv.includes(item.id)) {
+        inv.push(item.id);
+     }
+  }
+  res.json({ success: true, data: user?.inventory });
 });
 
+// --- Store APIs ---
+app.get('/api/store/items', (req, res) => res.json({ success: true, data: storeItems }));
 
 // --- Rooms APIs ---
-app.get('/api/rooms', (req, res) => {
-  res.json({ success: true, data: rooms });
-});
-
+app.get('/api/rooms', (req, res) => res.json({ success: true, data: rooms }));
 app.get('/api/rooms/:id', (req, res) => {
   const room = rooms.find(r => r.id === req.params.id);
-  if (room) {
-    res.json({ success: true, data: room });
-  } else {
-    res.status(404).json({ success: false, message: 'Room not found' });
-  }
+  room ? res.json({ success: true, data: room }) : res.status(404).json({ success: false, message: 'Room not found' });
 });
-
 app.post('/api/rooms', (req, res) => {
   const { scriptId, host } = req.body;
-  if (!scriptId || !host) {
-    return res.status(400).json({ success: false, message: 'Missing scriptId or host' });
-  }
-
   const script = scripts.find(s => s.id === scriptId);
-  if (!script) {
-    return res.status(404).json({ success: false, message: 'Script not found' });
-  }
-
-  const newRoom = {
-    id: `room_${Date.now()}`,
-    scriptId,
-    host,
-    currentPlayers: 1,
-    targetPlayers: script.players.male + script.players.female + script.players.any,
-    status: 'waiting',
-    players: [host]
-  };
-
+  if (!script) return res.status(404).json({ success: false, message: 'Script not found' });
+  const newRoom = { id: `room_${Date.now()}`, scriptId, host, currentPlayers: 1, targetPlayers: script.players.male + script.players.female + script.players.any, status: 'waiting', players: [host] };
   rooms.push(newRoom);
-
-  roomStates[newRoom.id] = {
-    currentAct: 'act_1',
-    revealedClues: [],
-    chatLog: [],
-    roleAssignments: {},
-    votes: {}
-  };
-
+  roomStates[newRoom.id] = { currentAct: 'act_1', revealedClues: [], chatLog: [], roleAssignments: {}, votes: {} };
   res.status(201).json({ success: true, data: newRoom });
 });
-
 app.post('/api/rooms/:id/join', (req, res) => {
-  const { userId } = req.body;
   const room = rooms.find(r => r.id === req.params.id);
-
-  if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
-  if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
-
-  if (room.players.includes(userId)) {
-    return res.status(400).json({ success: false, message: 'User already in room' });
+  if (room && req.body.userId && !room.players.includes(req.body.userId) && room.currentPlayers < room.targetPlayers) {
+    room.players.push(req.body.userId);
+    room.currentPlayers++;
+    io.to(room.id).emit('playerJoined', { userId: req.body.userId, room });
   }
-  if (room.currentPlayers >= room.targetPlayers) {
-    return res.status(400).json({ success: false, message: 'Room is full' });
-  }
-
-  room.players.push(userId);
-  room.currentPlayers += 1;
-
-  io.to(room.id).emit('playerJoined', { userId, room });
   res.json({ success: true, data: room });
 });
-
 app.post('/api/rooms/:id/leave', (req, res) => {
-  const { userId } = req.body;
   const room = rooms.find(r => r.id === req.params.id);
-
-  if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
-  if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
-
-  room.players = room.players.filter(p => p !== userId);
-  room.currentPlayers = Math.max(0, room.currentPlayers - 1);
-
-  io.to(room.id).emit('playerLeft', { userId, room });
+  if (room && req.body.userId) {
+    room.players = room.players.filter(p => p !== req.body.userId);
+    room.currentPlayers = Math.max(0, room.currentPlayers - 1);
+    io.to(room.id).emit('playerLeft', { userId: req.body.userId, room });
+  }
   res.json({ success: true, data: room });
 });
 
-// --- Game Flow APIs ---
+// --- DM Controls ---
+app.post('/api/rooms/:id/dm/kick', (req, res) => {
+  const room = rooms.find(r => r.id === req.params.id);
+  const { targetUserId, hostId } = req.body;
+  if (!room || room.host !== hostId) return res.status(403).json({ success: false, message: 'Unauthorized DM action' });
+  room.players = room.players.filter(p => p !== targetUserId);
+  room.currentPlayers = Math.max(0, room.currentPlayers - 1);
+  io.to(room.id).emit('playerKicked', { targetUserId, room });
+  res.json({ success: true, data: room });
+});
+app.post('/api/rooms/:id/dm/assign-role', (req, res) => {
+  const room = rooms.find(r => r.id === req.params.id);
+  const state = roomStates[req.params.id];
+  const { targetUserId, roleId, hostId } = req.body;
+  if (!room || room.host !== hostId || !state) return res.status(403).json({ success: false, message: 'Unauthorized DM action' });
+  state.roleAssignments[targetUserId] = roleId;
+  io.to(room.id).emit('roleAssigned', { targetUserId, roleId });
+  res.json({ success: true, data: state.roleAssignments });
+});
+
+// --- Game Flow & State ---
 app.post('/api/rooms/:id/start', (req, res) => {
   const room = rooms.find(r => r.id === req.params.id);
-  if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
-
-  const script = scripts.find(s => s.id === room.scriptId);
-  if (!script) return res.status(404).json({ success: false, message: 'Script not found' });
-
-  // Basic role assignment simulation
-  const state = roomStates[room.id];
-  const availableRoles = [...(script.roles || [])];
-
-  room.players.forEach(userId => {
-    if (availableRoles.length > 0) {
-      const role = availableRoles.pop();
-      if(role) state.roleAssignments[userId] = role.id;
-    }
-  });
-
-  room.status = 'playing';
-  io.to(room.id).emit('gameStarted', { room, roleAssignments: state.roleAssignments });
-
-  res.json({ success: true, data: room, roleAssignments: state.roleAssignments });
-});
-
-app.post('/api/rooms/:id/end', (req, res) => {
-  const room = rooms.find(r => r.id === req.params.id);
-  if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
-
-  room.status = 'finished';
-  io.to(room.id).emit('gameEnded', { room });
-
+  if (room) {
+    room.status = 'playing';
+    io.to(room.id).emit('gameStarted', { room });
+  }
   res.json({ success: true, data: room });
 });
-
-// --- Voting APIs ---
+app.post('/api/rooms/:id/end', (req, res) => {
+  const room = rooms.find(r => r.id === req.params.id);
+  if (room) {
+    room.status = 'finished';
+    io.to(room.id).emit('gameEnded', { room });
+  }
+  res.json({ success: true, data: room });
+});
 app.post('/api/rooms/:id/vote', (req, res) => {
-  const { voterId, targetRoleId } = req.body;
   const state = roomStates[req.params.id];
-
-  if (!state) return res.status(404).json({ success: false, message: 'Room state not found' });
-  if (!voterId || !targetRoleId) return res.status(400).json({ success: false, message: 'Missing voterId or targetRoleId' });
-
-  state.votes[voterId] = targetRoleId;
-  io.to(req.params.id).emit('voteCast', { voterId, targetRoleId });
-
-  res.json({ success: true, data: state.votes });
-});
-
-app.get('/api/rooms/:id/vote', (req, res) => {
-  const state = roomStates[req.params.id];
-  if (!state) return res.status(404).json({ success: false, message: 'Room state not found' });
-
-  res.json({ success: true, data: state.votes });
-});
-
-
-// --- Game State Modifiers ---
-app.get('/api/rooms/:id/state', (req, res) => {
-  const state = roomStates[req.params.id];
-  if (state) {
-    res.json({ success: true, data: state });
-  } else {
-    res.status(404).json({ success: false, message: 'Game state not found for this room' });
+  if (state && req.body.voterId && req.body.targetRoleId) {
+    state.votes[req.body.voterId] = req.body.targetRoleId;
+    io.to(req.params.id).emit('voteCast', { voterId: req.body.voterId, targetRoleId: req.body.targetRoleId });
   }
+  res.json({ success: true, data: state?.votes });
 });
+app.get('/api/rooms/:id/vote', (req, res) => res.json({ success: true, data: roomStates[req.params.id]?.votes }));
 
+app.get('/api/rooms/:id/state', (req, res) => res.json({ success: true, data: roomStates[req.params.id] }));
 app.post('/api/rooms/:id/state/clues', (req, res) => {
-  const { clueId } = req.body;
-  const roomId = req.params.id;
-  const state = roomStates[roomId];
-
-  if (!state) return res.status(404).json({ success: false, message: 'Room state not found' });
-  if (!clueId) return res.status(400).json({ success: false, message: 'Missing clueId' });
-
-  if (!state.revealedClues.includes(clueId)) {
-    state.revealedClues.push(clueId);
-    io.to(roomId).emit('clueRevealed', { clueId, state });
+  const state = roomStates[req.params.id];
+  if (state && req.body.clueId && !state.revealedClues.includes(req.body.clueId)) {
+    state.revealedClues.push(req.body.clueId);
+    io.to(req.params.id).emit('clueRevealed', { clueId: req.body.clueId, state });
   }
-
+  res.json({ success: true, data: state });
+});
+app.post('/api/rooms/:id/state/act', (req, res) => {
+  const state = roomStates[req.params.id];
+  if (state && req.body.actId) {
+    state.currentAct = req.body.actId;
+    io.to(req.params.id).emit('actChanged', { actId: req.body.actId, state });
+  }
   res.json({ success: true, data: state });
 });
 
-app.post('/api/rooms/:id/state/act', (req, res) => {
-  const { actId } = req.body;
-  const roomId = req.params.id;
-  const state = roomStates[roomId];
-
-  if (!state) return res.status(404).json({ success: false, message: 'Room state not found' });
-  if (!actId) return res.status(400).json({ success: false, message: 'Missing actId' });
-
-  state.currentAct = actId;
-  io.to(roomId).emit('actChanged', { actId, state });
-
-  res.json({ success: true, data: state });
+// --- Private Whisper / Chat ---
+app.post('/api/rooms/:id/whisper', (req, res) => {
+  const state = roomStates[req.params.id];
+  const { senderId, targetId, text } = req.body;
+  if (!state || !senderId || !targetId || !text) return res.status(400).json({ success: false });
+  const msg = { id: `msg_${Date.now()}`, userId: senderId, targetId, text, timestamp: Date.now(), isPrivate: true };
+  state.chatLog.push(msg);
+  io.to(req.params.id).emit('whisperMessage', msg);
+  res.json({ success: true, data: msg });
 });
 
 // --- Socket.io Handlers ---
 io.on('connection', (socket: Socket) => {
-  console.log('User connected:', socket.id);
-
-  socket.on('joinRoom', (roomId: string, userId: string) => {
-    socket.join(roomId);
-    console.log(`User ${userId} (${socket.id}) joined socket room ${roomId}`);
-  });
-
+  socket.on('joinRoom', (roomId: string, userId: string) => socket.join(roomId));
   socket.on('chatMessage', (roomId: string, message: { userId: string, text: string }) => {
     const state = roomStates[roomId];
     if (state) {
-      const chatMsg = { ...message, timestamp: Date.now() };
+      const chatMsg = { id: `msg_${Date.now()}`, ...message, timestamp: Date.now(), isPrivate: false };
       state.chatLog.push(chatMsg);
       io.to(roomId).emit('chatMessage', chatMsg);
     }
   });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
 });
 
-const PORT = process.env.PORT || 3001;
-
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+server.listen(process.env.PORT || 3001);

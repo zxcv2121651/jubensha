@@ -38,10 +38,10 @@ export const rooms = [
   {
     id: 'room_1',
     scriptId: '1',
-    host: 'user_1',
+    host: 'user_1', // DM
     currentPlayers: 4,
     targetPlayers: 6,
-    status: 'waiting', // waiting, playing, finished
+    status: 'waiting',
     players: ['user_1', 'user_2', 'user_3', 'user_4']
   }
 ];
@@ -56,7 +56,20 @@ export const users = [
     history: [
       { id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队' }
     ],
-    favorites: ['1', '2']
+    favorites: ['1', '2'],
+    friends: ['user_2'],
+    inventory: [] // e.g. custom avatar frames, chat bubbles
+  },
+  {
+    id: 'user_2',
+    name: '推理小白',
+    bio: '努力学习中',
+    avatar: 'https://picsum.photos/seed/u2/150/150',
+    stats: { played: 5, favorites: 2, reviews: 1 },
+    history: [],
+    favorites: [],
+    friends: ['user_1'],
+    inventory: []
   }
 ];
 
@@ -65,9 +78,14 @@ export const roomStates: Record<string, any> = {
     currentAct: 'act_1',
     revealedClues: ['clue_1', 'clue_2'],
     chatLog: [
-      { userId: 'user_1', text: '大家好！', timestamp: Date.now() }
+      { id: 'msg1', userId: 'user_1', text: '大家好！', timestamp: Date.now(), isPrivate: false }
     ],
     roleAssignments: {}, // { userId: roleId }
     votes: {} // { voterUserId: targetRoleId }
   }
 };
+
+export const storeItems = [
+  { id: 'item_1', name: '大侦探头像框', type: 'avatar_frame', price: 100 },
+  { id: 'item_2', name: '血迹气泡', type: 'chat_bubble', price: 200 }
+];
