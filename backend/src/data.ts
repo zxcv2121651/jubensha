@@ -26,12 +26,14 @@ export const users: any[] = [
     id: 'user_1', username: 'admin', password: 'password123', name: '剧本杀老司机', bio: '推理无情，沉浸有爱。', avatar: 'https://picsum.photos/seed/u1/150/150', stats: { played: 42, favorites: 15, reviews: 8, rating: 4.9 },
     history: [{ id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队' }],
     favorites: ['1', '2'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000,
-    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: 'club_1'
+    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: 'club_1',
+    wishlist: ['2'], checkinStreak: 5, lastCheckin: Date.now() - 86400000 // yesterday
   },
   {
     id: 'user_2', username: 'testuser', password: 'password123', name: '推理小白', bio: '努力学习中', avatar: 'https://picsum.photos/seed/u2/150/150', stats: { played: 5, favorites: 2, reviews: 1, rating: 4.2 },
     history: [], favorites: [], friends: ['user_1'], blacklist: ['user_3'], inventory: [], library: [], achievements: ['ach_1'], balance: 50,
-    isVip: true, vipExpiry: Date.now() + 86400000 * 30, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: null
+    isVip: true, vipExpiry: Date.now() + 86400000 * 30, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: null,
+    wishlist: [], checkinStreak: 0, lastCheckin: 0
   }
 ];
 
@@ -53,21 +55,20 @@ export const notifications = [
 export const reports: any[] = [];
 
 export const roomStates: Record<string, any> = {
-  'room_1': { currentAct: 'act_1', revealedClues: ['clue_1', 'clue_2'], chatLog: [{ id: 'msg1', userId: 'user_1', text: '大家好！', timestamp: Date.now(), isPrivate: false }], roleAssignments: {}, votes: {}, isPaused: false }
+  'room_1': {
+     currentAct: 'act_1', revealedClues: ['clue_1', 'clue_2'], chatLog: [{ id: 'msg1', userId: 'user_1', text: '大家好！', timestamp: Date.now(), isPrivate: false }],
+     roleAssignments: {}, votes: {}, isPaused: false,
+     playerInventories: { // For in-game item trading (机制本)
+       'user_1': ['clue_1', 'gold_coin'],
+       'user_2': ['silver_key']
+     }
+  }
 };
 
 export const gameResults: Record<string, any> = {};
 
 export const gameReplays: Record<string, any> = {
-  'room_history_1': {
-    roomId: 'room_history_1',
-    scriptId: '1',
-    events: [
-      { timestamp: 1633000000, type: 'start', description: '游戏开始' },
-      { timestamp: 1633000500, type: 'clue', description: 'DM公开线索：带血的匕首' },
-      { timestamp: 1633004000, type: 'vote', description: '玩家一指认玩家二' }
-    ]
-  }
+  'room_history_1': { roomId: 'room_history_1', scriptId: '1', events: [ { timestamp: 1633000000, type: 'start', description: '游戏开始' } ] }
 };
 
 export const storeItems = [
@@ -76,7 +77,6 @@ export const storeItems = [
   { id: 'vip_1', name: '月度大会员', type: 'subscription', price: 300 }
 ];
 
-// Gacha Pool (Items you can win from blind boxes)
 export const gachaPool = [
   { id: 'gacha_1', name: '传说级入场动画 - 龙', dropRate: 0.05 },
   { id: 'gacha_2', name: '史诗级头像框 - 金', dropRate: 0.15 },

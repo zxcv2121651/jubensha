@@ -58,7 +58,8 @@ app.post('/api/auth/register', (req, res) => {
   const newUser = {
     id: `user_${Date.now()}`, username, password, name: name || username, bio: '', avatar: 'https://picsum.photos/seed/new/150/150',
     stats: { played: 0, favorites: 0, reviews: 0, rating: 0 }, history: [], favorites: [], friends: [], blacklist: [], inventory: [], library: [], achievements: [], balance: 0,
-    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: [ { id: 'q_1', title: '每日首胜', reward: 50, isClaimed: false }, { id: 'q_2', title: '结交新友', reward: 20, isClaimed: false } ], clubId: null
+    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: [ { id: 'q_1', title: '每日首胜', reward: 50, isClaimed: false }, { id: 'q_2', title: '结交新友', reward: 20, isClaimed: false } ], clubId: null,
+    wishlist: [], checkinStreak: 0, lastCheckin: 0
   };
   users.push(newUser);
   const { password: _, ...safeUser } = newUser;
@@ -86,7 +87,7 @@ app.post('/api/users/:id/subscription', (req, res) => {
   res.json({ success: true, data: { isVip: user.isVip, vipExpiry: user.vipExpiry, balance: user.balance } });
 });
 
-// --- Quests APIs ---
+// --- Quests & Check-in APIs ---
 app.get('/api/users/:id/quests', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   user ? res.json({ success: true, data: user.quests }) : res.status(404).json({ success: false, message: 'User not found' });
@@ -100,6 +101,24 @@ app.post('/api/users/:id/quests/:questId/claim', (req, res) => {
   quest.isClaimed = true;
   user.balance += quest.reward;
   res.json({ success: true, data: { quests: user.quests, balance: user.balance } });
+});
+app.post('/api/users/:id/checkin', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ success: false });
+
+  const now = Date.now();
+  const ONE_DAY = 86400000;
+
+  // Very basic mock logic for daily streak
+  if (now - user.lastCheckin < ONE_DAY) {
+     return res.status(400).json({ success: false, message: 'Already checked in today' });
+  }
+
+  user.checkinStreak = (now - user.lastCheckin <= ONE_DAY * 2) ? user.checkinStreak + 1 : 1;
+  user.lastCheckin = now;
+  user.balance += 10 + (user.checkinStreak * 5); // Reward scaling
+
+  res.json({ success: true, data: { streak: user.checkinStreak, balance: user.balance } });
 });
 
 
@@ -115,7 +134,6 @@ app.get('/api/scripts/:id', (req, res) => {
   script ? res.json({ success: true, data: script }) : res.status(404).json({ success: false, message: 'Script not found' });
 });
 app.post('/api/scripts', (req, res) => {
-  // UGC Script upload
   const { title, tags, players, duration, difficulty, description, roles, authorId } = req.body;
   const newScript = {
     id: `script_${Date.now()}`, title, tags: tags || [], players: players || { male:0, female:0, any:0 },
@@ -151,13 +169,13 @@ app.post('/api/users/:id/tip', (req, res) => {
   if (sender.balance < amount || amount <= 0) return res.status(400).json({ success: false, message: 'Invalid or insufficient balance' });
 
   sender.balance -= amount;
-  targetDM.balance += amount;
+  targetDM.balance += amount; // The tip goes to their balance
   targetDM.dmTipsReceived += amount;
 
   res.json({ success: true, data: { senderBalance: sender.balance } });
 });
 
-// --- User Profile, Social, Messages, Blacklist & Inventory APIs ---
+// --- User Profile, Social, Messages, Blacklist, Wishlist & Inventory APIs ---
 app.get('/api/users/:id', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if(user) {
@@ -210,6 +228,15 @@ app.delete('/api/users/:id/blacklist/:targetId', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if (user) user.blacklist = user.blacklist.filter((id:string) => id !== req.params.targetId);
   res.json({ success: true, data: user?.blacklist });
+});
+
+// Wishlist
+app.post('/api/users/:id/wishlist', (req, res) => {
+  const user = users.find(u => u.id === req.params.id);
+  if (user && req.body.scriptId && !user.wishlist.includes(req.body.scriptId)) {
+    user.wishlist.push(req.body.scriptId);
+  }
+  res.json({ success: true, data: user?.wishlist });
 });
 
 // Direct Messaging
@@ -293,10 +320,9 @@ app.post('/api/store/gacha', (req, res) => {
   }
 
   user.balance -= GACHA_COST;
-  // Simple weighted random logic
   const rand = Math.random();
   let cumulative = 0;
-  let wonItem = gachaPool[gachaPool.length - 1]; // default fallback
+  let wonItem = gachaPool[gachaPool.length - 1];
 
   for (const item of gachaPool) {
     cumulative += item.dropRate;
@@ -337,7 +363,6 @@ app.get('/api/analytics/dm/:userId', (req, res) => {
   if (!user) return res.status(404).json({ success: false });
 
   const dmGamesHosted = rooms.filter(r => r.host === req.params.userId && r.status === 'finished').length;
-  // Mocking advanced analytics
   res.json({ success: true, data: { gamesHosted: dmGamesHosted, averageRating: user.stats.rating, tipsEarned: user.dmTipsReceived } });
 });
 
@@ -372,7 +397,8 @@ app.post('/api/rooms', (req, res) => {
   if (!script) return res.status(404).json({ success: false, message: 'Script not found' });
   const newRoom = { id: `room_${Date.now()}`, scriptId, host, currentPlayers: 1, targetPlayers: script.players.male + script.players.female + script.players.any, status: 'waiting', players: [host], password: password || '', isPublic: isPublic ?? true };
   rooms.push(newRoom);
-  roomStates[newRoom.id] = { currentAct: 'act_1', revealedClues: [], chatLog: [], roleAssignments: {}, votes: {}, isPaused: false };
+  // Also init playerInventories for the host
+  roomStates[newRoom.id] = { currentAct: 'act_1', revealedClues: [], chatLog: [], roleAssignments: {}, votes: {}, isPaused: false, playerInventories: { [host]: [] } };
   res.status(201).json({ success: true, data: newRoom });
 });
 app.put('/api/rooms/:id/settings', (req, res) => {
@@ -397,6 +423,10 @@ app.post('/api/rooms/:id/join', (req, res) => {
   if (req.body.userId && !room.players.includes(req.body.userId) && room.currentPlayers < room.targetPlayers) {
     room.players.push(req.body.userId);
     room.currentPlayers++;
+    // Add to playerInventories state
+    if (roomStates[room.id] && !roomStates[room.id].playerInventories[req.body.userId]) {
+      roomStates[room.id].playerInventories[req.body.userId] = [];
+    }
     io.to(room.id).emit('playerJoined', { userId: req.body.userId, room });
   }
   res.json({ success: true, data: room });
@@ -456,6 +486,16 @@ app.post('/api/rooms/:id/dm/assign-role', (req, res) => {
   io.to(room.id).emit('roleAssigned', { targetUserId, roleId });
   res.json({ success: true, data: state.roleAssignments });
 });
+app.post('/api/rooms/:id/dm/mute-all', (req, res) => {
+  const room = rooms.find(r => r.id === req.params.id);
+  const { hostId, mute } = req.body;
+  if (!room || room.host !== hostId) return res.status(403).json({ success: false, message: 'Unauthorized DM action' });
+
+  // In a real app this would call LiveKit Server SDK
+  // roomService.mutePublishedTrack(...)
+  io.to(room.id).emit('dmMuteAll', { mute });
+  res.json({ success: true, message: mute ? 'All muted' : 'All unmuted' });
+});
 
 // --- Game Flow & State ---
 app.post('/api/rooms/:id/start', (req, res) => {
@@ -484,6 +524,27 @@ app.post('/api/rooms/:id/vote', (req, res) => {
 });
 app.get('/api/rooms/:id/vote', (req, res) => res.json({ success: true, data: roomStates[req.params.id]?.votes }));
 
+// Advanced state manipulations (机制本)
+app.post('/api/rooms/:id/trade', (req, res) => {
+  const state = roomStates[req.params.id];
+  const { senderId, receiverId, itemId } = req.body;
+  if (!state || !state.playerInventories) return res.status(404).json({ success: false });
+
+  const senderInv = state.playerInventories[senderId] || [];
+  const receiverInv = state.playerInventories[receiverId] || [];
+
+  const itemIndex = senderInv.indexOf(itemId);
+  if (itemIndex > -1) {
+    senderInv.splice(itemIndex, 1);
+    receiverInv.push(itemId);
+    state.playerInventories[senderId] = senderInv;
+    state.playerInventories[receiverId] = receiverInv;
+    io.to(req.params.id).emit('itemTraded', { senderId, receiverId, itemId });
+    return res.json({ success: true, data: state.playerInventories });
+  }
+  res.status(400).json({ success: false, message: 'Item not found in sender inventory' });
+});
+
 app.get('/api/rooms/:id/state', (req, res) => res.json({ success: true, data: roomStates[req.params.id] }));
 app.post('/api/rooms/:id/state/clues', (req, res) => {
   const state = roomStates[req.params.id];
@@ -511,13 +572,19 @@ app.post('/api/rooms/:id/state/pause', (req, res) => {
 });
 app.post('/api/rooms/:id/state/reset', (req, res) => {
   const state = roomStates[req.params.id];
-  if (state) {
+  const room = rooms.find(r => r.id === req.params.id);
+  if (state && room) {
     state.currentAct = 'act_1';
     state.revealedClues = [];
     state.chatLog = [];
     state.roleAssignments = {};
     state.votes = {};
     state.isPaused = false;
+    // reset inventories
+    const freshInvs: any = {};
+    room.players.forEach(p => freshInvs[p] = []);
+    state.playerInventories = freshInvs;
+
     io.to(req.params.id).emit('gameReset', { state });
   }
   res.json({ success: true, data: state });
