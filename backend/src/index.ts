@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
-import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages } from './data';
+import { scripts, rooms, users, roomStates, reviews, storeItems, notifications, reports, achievements, directMessages, matchmakingQueues } from './data';
 
 const app = express();
 app.use(cors());
@@ -13,11 +13,14 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }
 });
 
-// --- Helper ---
 const getChatKey = (id1: string, id2: string) => [id1, id2].sort().join('_');
 
-// --- Health Check ---
+// --- Health Check & Mock Uploads ---
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.post('/api/upload', (req, res) => {
+  // Mocking file upload returning a pic url
+  res.json({ success: true, data: { url: `https://picsum.photos/seed/${Date.now()}/400/400` } });
+});
 
 // --- Auth APIs ---
 app.post('/api/auth/login', (req, res) => {
@@ -37,7 +40,7 @@ app.post('/api/auth/register', (req, res) => {
   }
   const newUser = {
     id: `user_${Date.now()}`, username, password, name: name || username, bio: '', avatar: 'https://picsum.photos/seed/new/150/150',
-    stats: { played: 0, favorites: 0, reviews: 0, rating: 0 }, history: [], favorites: [], friends: [], inventory: [], library: [], achievements: []
+    stats: { played: 0, favorites: 0, reviews: 0, rating: 0 }, history: [], favorites: [], friends: [], inventory: [], library: [], achievements: [], balance: 0
   };
   users.push(newUser);
   const { password: _, ...safeUser } = newUser;
@@ -47,7 +50,6 @@ app.post('/api/auth/register', (req, res) => {
 // --- Scripts & Reviews APIs ---
 app.get('/api/scripts', (req, res) => {
   let result = [...scripts];
-  // Basic filtering mock
   if (req.query.tag) result = result.filter(s => s.tags.includes(req.query.tag as string));
   if (req.query.difficulty) result = result.filter(s => s.difficulty === req.query.difficulty);
   res.json({ success: true, data: result });
@@ -103,7 +105,6 @@ app.post('/api/users/:id/friends/:friendId', (req, res) => {
   if (user && !user.friends.includes(req.params.friendId)) user.friends.push(req.params.friendId);
   res.json({ success: true, data: user?.friends });
 });
-// Direct Messaging
 app.get('/api/users/:id/messages/:friendId', (req, res) => {
   const chatKey = getChatKey(req.params.id, req.params.friendId);
   const msgs = directMessages[chatKey] || [];
@@ -152,7 +153,7 @@ app.post('/api/users/:id/notifications/:notifId/read', (req, res) => {
   res.json({ success: true, data: notif });
 });
 
-// --- System APIs ---
+// --- System APIs (Leaderboard, Store, Reports, Matchmaking) ---
 app.get('/api/leaderboard', (req, res) => {
   const sortedUsers = [...users].sort((a, b) => b.stats.played - a.stats.played).slice(0, 10);
   const data = sortedUsers.map(u => ({ id: u.id, name: u.name, avatar: u.avatar, played: u.stats.played, rating: u.stats.rating }));
@@ -165,6 +166,38 @@ app.post('/api/reports', (req, res) => {
   res.status(201).json({ success: true, data: newReport });
 });
 app.get('/api/store/items', (req, res) => res.json({ success: true, data: storeItems }));
+app.post('/api/store/buy', (req, res) => {
+  const { userId, itemId } = req.body;
+  const user = users.find(u => u.id === userId);
+  const item = storeItems.find(i => i.id === itemId);
+  if (!user || !item) return res.status(404).json({ success: false, message: 'User or item not found' });
+  if (user.balance < item.price) return res.status(400).json({ success: false, message: 'Insufficient balance' });
+
+  user.balance -= item.price;
+  if (!user.inventory.includes(item.id as never)) {
+    (user.inventory as string[]).push(item.id);
+  }
+  res.json({ success: true, data: { balance: user.balance, inventory: user.inventory } });
+});
+
+app.post('/api/matchmaking/join', (req, res) => {
+  const { userId, scriptId } = req.body;
+  if (!matchmakingQueues[scriptId]) matchmakingQueues[scriptId] = [];
+  if (!matchmakingQueues[scriptId].includes(userId)) {
+    matchmakingQueues[scriptId].push(userId);
+  }
+  res.json({ success: true, data: { queueLength: matchmakingQueues[scriptId].length } });
+});
+app.post('/api/matchmaking/leave', (req, res) => {
+  const { userId, scriptId } = req.body;
+  if (matchmakingQueues[scriptId]) {
+    matchmakingQueues[scriptId] = matchmakingQueues[scriptId].filter(id => id !== userId);
+  }
+  res.json({ success: true });
+});
+app.get('/api/matchmaking/status', (req, res) => {
+  res.json({ success: true, data: matchmakingQueues });
+});
 
 // --- Rooms APIs ---
 app.get('/api/rooms', (req, res) => res.json({ success: true, data: rooms }));
@@ -178,7 +211,7 @@ app.post('/api/rooms', (req, res) => {
   if (!script) return res.status(404).json({ success: false, message: 'Script not found' });
   const newRoom = { id: `room_${Date.now()}`, scriptId, host, currentPlayers: 1, targetPlayers: script.players.male + script.players.female + script.players.any, status: 'waiting', players: [host], password: password || '', isPublic: isPublic ?? true };
   rooms.push(newRoom);
-  roomStates[newRoom.id] = { currentAct: 'act_1', revealedClues: [], chatLog: [], roleAssignments: {}, votes: {} };
+  roomStates[newRoom.id] = { currentAct: 'act_1', revealedClues: [], chatLog: [], roleAssignments: {}, votes: {}, isPaused: false };
   res.status(201).json({ success: true, data: newRoom });
 });
 app.put('/api/rooms/:id/settings', (req, res) => {
@@ -270,6 +303,27 @@ app.post('/api/rooms/:id/state/act', (req, res) => {
   if (state && req.body.actId) {
     state.currentAct = req.body.actId;
     io.to(req.params.id).emit('actChanged', { actId: req.body.actId, state });
+  }
+  res.json({ success: true, data: state });
+});
+app.post('/api/rooms/:id/state/pause', (req, res) => {
+  const state = roomStates[req.params.id];
+  if (state) {
+    state.isPaused = req.body.isPaused;
+    io.to(req.params.id).emit('gamePaused', { isPaused: state.isPaused });
+  }
+  res.json({ success: true, data: state });
+});
+app.post('/api/rooms/:id/state/reset', (req, res) => {
+  const state = roomStates[req.params.id];
+  if (state) {
+    state.currentAct = 'act_1';
+    state.revealedClues = [];
+    state.chatLog = [];
+    state.roleAssignments = {};
+    state.votes = {};
+    state.isPaused = false;
+    io.to(req.params.id).emit('gameReset', { state });
   }
   res.json({ success: true, data: state });
 });
