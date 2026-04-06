@@ -8,91 +8,58 @@ export const scripts: any[] = [
   }
 ];
 
-// Drafts for UGC Editor (Separate from published scripts)
 export const ugcDrafts: any[] = [];
-
-export const reviews: any[] = [
-  { id: 'r1', scriptId: '1', user: '剧本杀老司机', userId: 'user_1', rating: 5, content: '强推！', date: '2023-10-01', likes: 10 }
-];
-
-export const rooms = [
-  { id: 'room_1', scriptId: '1', host: 'user_1', currentPlayers: 4, targetPlayers: 6, status: 'waiting', players: ['user_1', 'user_2', 'user_3', 'user_4'], password: '', isPublic: true }
-];
-
-export const achievements = [
-  { id: 'ach_1', name: '初出茅庐', description: '完成第一次剧本杀', icon: '🌟' },
-  { id: 'ach_2', name: '推理大师', description: '成功指认凶手10次', icon: '🔍' }
-];
-
-export const quests = [
-  { id: 'q_1', title: '每日首胜', reward: 50, isClaimed: false },
-  { id: 'q_2', title: '结交新友', reward: 20, isClaimed: false }
-];
+export const reviews: any[] = [];
+export const rooms: any[] = [];
+export const achievements: any[] = [];
+export const quests: any[] = [];
 
 export const users: any[] = [
   {
-    id: 'user_1', username: 'admin', password: 'password123', name: '剧本杀老司机', bio: '推理无情，沉浸有爱。', avatar: 'https://picsum.photos/seed/u1/150/150', stats: { played: 42, favorites: 15, reviews: 8, rating: 4.9 },
-    history: [{ id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队', resultSummary: '成功推凶' }],
-    favorites: ['1'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000,
-    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: 'club_1',
-    wishlist: [], checkinStreak: 5, lastCheckin: Date.now() - 86400000,
-    isAdmin: true, accountStatus: 'active'
+    id: 'user_1', username: 'admin', password: '123', name: '剧本杀老司机', bio: '推理无情，沉浸有爱。', avatar: 'https://picsum.photos/seed/u1/150/150', stats: { played: 42, favorites: 15, reviews: 8, rating: 4.9 },
+    history: [], favorites: [], friends: ['user_2'], blacklist: [], inventory: [], library: [], achievements: [], balance: 1000,
+    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: [], clubId: 'club_1', wishlist: [], checkinStreak: 5, lastCheckin: Date.now() - 86400000,
+    isAdmin: true, accountStatus: 'active',
+    // Ranked System
+    elo: 1250, rank: '黄金', rankedWins: 20, rankedLosses: 5
   },
   {
-    id: 'user_2', username: 'testuser', password: 'password123', name: '推理小白', bio: '努力学习中', avatar: 'https://picsum.photos/seed/u2/150/150', stats: { played: 5, favorites: 2, reviews: 1, rating: 4.2 },
-    history: [], favorites: [], friends: ['user_1'], blacklist: ['user_3'], inventory: [], library: [], achievements: ['ach_1'], balance: 50,
-    isVip: true, vipExpiry: Date.now() + 86400000 * 30, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: null,
-    wishlist: [], checkinStreak: 0, lastCheckin: 0,
-    isAdmin: false, accountStatus: 'active'
+    id: 'user_2', username: 'testuser', password: '123', name: '推理小白', bio: '努力学习中', avatar: 'https://picsum.photos/seed/u2/150/150', stats: { played: 5, favorites: 2, reviews: 1, rating: 4.2 },
+    history: [], favorites: [], friends: ['user_1'], blacklist: [], inventory: [], library: [], achievements: [], balance: 50,
+    isVip: true, vipExpiry: Date.now() + 86400000 * 30, dmTipsReceived: 0, quests: [], clubId: null, wishlist: [], checkinStreak: 0, lastCheckin: 0,
+    isAdmin: false, accountStatus: 'active',
+    // Ranked System
+    elo: 950, rank: '青铜', rankedWins: 2, rankedLosses: 8
+  },
+  {
+    id: 'user_3', username: 'pro_player', password: '123', name: '职业推土机', bio: '', avatar: 'https://picsum.photos/seed/u3/150/150', stats: { played: 100, favorites: 0, reviews: 0, rating: 5.0 },
+    history: [], favorites: [], friends: [], blacklist: [], inventory: [], library: [], achievements: [], balance: 0,
+    isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: [], clubId: null, wishlist: [], checkinStreak: 0, lastCheckin: 0,
+    isAdmin: false, accountStatus: 'active',
+    // Ranked System
+    elo: 1300, rank: '黄金', rankedWins: 50, rankedLosses: 10
   }
 ];
 
-export const clubs: any[] = [
-  { id: 'club_1', name: '午夜推理社', description: '全是硬核老粉', leaderId: 'user_1', members: ['user_1'] }
-];
-
-export const directMessages: Record<string, any[]> = {
-  'user_1_user_2': [
-    { id: 'm1', senderId: 'user_1', text: '今晚打本吗？', timestamp: Date.now() - 3600000 },
-    { id: 'm2', senderId: 'user_2', text: '来！', timestamp: Date.now() - 3500000 }
-  ]
-};
-
-export const notifications = [
-  { id: 'n1', userId: 'user_1', type: 'friend_request', message: 'User2 请求添加好友', read: false, createdAt: Date.now() }
-];
-
+export const clubs: any[] = [];
+export const directMessages: Record<string, any[]> = {};
+export const notifications: any[] = [];
 export const reports: any[] = [];
-
-export const roomStates: Record<string, any> = {
-  'room_1': {
-     currentAct: 'act_1', revealedClues: ['clue_1', 'clue_2'], chatLog: [{ id: 'msg1', userId: 'user_1', text: '大家好！', timestamp: Date.now(), isPrivate: false }],
-     roleAssignments: {}, votes: {}, isPaused: false,
-     playerInventories: { 'user_1': ['clue_1', 'gold_coin'], 'user_2': ['silver_key'] },
-     readyStatus: { 'user_1': true, 'user_2': false, 'user_3': false, 'user_4': false }
-  }
-};
-
+export const roomStates: Record<string, any> = {};
 export const gameResults: Record<string, any> = {};
+export const gameReplays: Record<string, any> = {};
+export const storeItems: any[] = [];
+export const promoCodes: Record<string, any> = {};
+export const gachaPool: any[] = [];
 
-export const gameReplays: Record<string, any> = {
-  'room_history_1': { roomId: 'room_history_1', scriptId: '1', events: [ { timestamp: 1633000000, type: 'start', description: '游戏开始' } ] }
-};
-
-export const storeItems = [
-  { id: 'item_1', name: '大侦探头像框', type: 'avatar_frame', price: 100 },
-  { id: 'item_2', name: '血迹气泡', type: 'chat_bubble', price: 200 },
-  { id: 'vip_1', name: '月度大会员', type: 'subscription', price: 300 }
-];
-
-export const promoCodes: Record<string, any> = {
-  'WELCOME2024': { reward: 500, type: 'balance', usedBy: [] }
-};
-
-export const gachaPool = [
-  { id: 'gacha_1', name: '传说级入场动画 - 龙', dropRate: 0.05 },
-  { id: 'gacha_2', name: '史诗级头像框 - 金', dropRate: 0.15 },
-  { id: 'gacha_3', name: '普通改名卡', dropRate: 0.80 }
-];
-
+// Casual Queue: scriptId -> array of userIds
 export const matchmakingQueues: Record<string, string[]> = {};
+
+// Ranked Queue: RankTier -> ScriptId -> array of userIds
+export const rankedQueues: Record<string, Record<string, string[]>> = {
+  '青铜': {},
+  '白银': {},
+  '黄金': {},
+  '钻石': {},
+  '王者': {}
+};
