@@ -5,6 +5,7 @@ import UsersManagement from './pages/UsersManagement';
 import ScriptsApproval from './pages/ScriptsApproval';
 import ReportsManagement from './pages/ReportsManagement';
 import StoreManagement from './pages/StoreManagement';
+import RoomsManagement from './pages/RoomsManagement';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/users" element={<UsersManagement />} />
+            <Route path="/rooms" element={<RoomsManagement />} />
             <Route path="/scripts" element={<ScriptsApproval />} />
             <Route path="/reports" element={<ReportsManagement />} />
             <Route path="/store" element={<StoreManagement />} />

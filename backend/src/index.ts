@@ -704,3 +704,28 @@ io.on('connection', (socket: Socket) => {
 });
 
 server.listen(process.env.PORT || 3001);
+
+// --- Additional Admin Controls (Rooms & Store) ---
+app.get('/api/admin/rooms', adminOnly, (req, res) => {
+  const populatedRooms = rooms.map(r => ({
+    ...r,
+    hostName: users.find(u => u.id === r.host)?.name || r.host,
+    scriptName: scripts.find(s => s.id === r.scriptId)?.title || '未知剧本'
+  }));
+  res.json({ success: true, data: populatedRooms });
+});
+
+app.post('/api/admin/rooms/:id/close', adminOnly, (req, res) => {
+  const room = rooms.find(r => r.id === req.params.id);
+  if (!room) return res.status(404).json({ success: false });
+  room.status = 'finished'; // Or "cancelled"
+  io.to(room.id).emit('roomClosedByAdmin', { message: '房间已被管理员强制解散' });
+  res.json({ success: true, data: room });
+});
+
+app.delete('/api/admin/store/:id', adminOnly, (req, res) => {
+  const itemIndex = storeItems.findIndex(i => i.id === req.params.id);
+  if (itemIndex === -1) return res.status(404).json({ success: false });
+  const deletedItem = storeItems.splice(itemIndex, 1);
+  res.json({ success: true, data: deletedItem });
+});

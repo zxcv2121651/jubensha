@@ -1,10 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, BookOpen, ShieldAlert, Store, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, RadioReceiver, Users, BookOpen, ShieldAlert, Store, Settings, LogOut } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const NAV_ITEMS = [
   { name: '总览', path: '/', icon: LayoutDashboard },
   { name: '用户管理', path: '/users', icon: Users },
+  { name: '实况监控', path: '/rooms', icon: RadioReceiver },
   { name: '剧本审批', path: '/scripts', icon: BookOpen },
   { name: '举报审核', path: '/reports', icon: ShieldAlert },
   { name: '商城与运营', path: '/store', icon: Store },
