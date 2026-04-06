@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import UsersManagement from './pages/UsersManagement';
 import ScriptsApproval from './pages/ScriptsApproval';
+import ReportsManagement from './pages/ReportsManagement';
+import StoreManagement from './pages/StoreManagement';
 
 function App() {
   return (
@@ -14,7 +16,9 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/users" element={<UsersManagement />} />
             <Route path="/scripts" element={<ScriptsApproval />} />
-            <Route path="*" element={<div className="p-8">模块正在开发中...</div>} />
+            <Route path="/reports" element={<ReportsManagement />} />
+            <Route path="/store" element={<StoreManagement />} />
+            <Route path="*" element={<div className="p-8 text-neutral-500 font-bold">模块正在开发中...</div>} />
           </Routes>
         </main>
       </div>
