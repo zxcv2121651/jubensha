@@ -761,3 +761,11 @@ app.get('/api/admin/logs', adminOnly, (req, res) => {
     }));
   res.json({ success: true, data: logs });
 });
+
+// --- Admin Script Preview ---
+app.get('/api/admin/scripts/:id/preview', adminOnly, (req, res) => {
+  // Check if it's a pending draft in the main scripts array
+  const script = scripts.find(s => s.id === req.params.id) || ugcDrafts.find(d => d.id === req.params.id);
+  if (!script) return res.status(404).json({ success: false, message: 'Script or draft not found' });
+  res.json({ success: true, data: script });
+});
