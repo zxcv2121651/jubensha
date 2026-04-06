@@ -1,59 +1,81 @@
-import { Users, Activity, PlayCircle, DollarSign } from 'lucide-react';
+import { Users, Activity, PlayCircle, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
 
 const STATS = [
-  { title: '总用户数', value: '12,450', change: '+12%', icon: Users, color: 'bg-blue-500 text-blue-50' },
-  { title: '正在进行的对局', value: '342', change: '+5%', icon: PlayCircle, color: 'bg-emerald-500 text-emerald-50' },
-  { title: '今日活跃用户', value: '4,192', change: '-2%', icon: Activity, color: 'bg-amber-500 text-amber-50' },
-  { title: '今日流水 (RMB)', value: '￥24,500', change: '+18%', icon: DollarSign, color: 'bg-rose-500 text-rose-50' },
+  { title: '今日开局总数', value: '342', change: '+5%', icon: PlayCircle, color: '#52c41a' },
+  { title: '平台活跃玩家', value: '12,450', change: '+12%', icon: Users, color: '#1890ff' },
+  { title: '注册 DM 人数', value: '1,192', change: '+2%', icon: Activity, color: '#722ed1' },
+  { title: '今日流水分成', value: '￥24,500', change: '-3%', icon: DollarSign, color: '#fa8c16' },
 ];
 
 export default function Dashboard() {
   return (
-    <div className="flex-1 min-h-screen bg-neutral-100 p-8 overflow-y-auto">
-      <header className="flex justify-between items-center mb-8">
+    <div className="flex-1 h-screen overflow-y-auto bg-[#f0f2f5] p-6">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">数据总览</h2>
-          <p className="text-sm text-neutral-500 mt-1">欢迎回来，这是今天平台的核心数据表现。</p>
+          <h2 className="text-xl font-bold text-gray-800">控制台</h2>
+          <div className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+            <span>首页</span>
+            <span>/</span>
+            <span className="text-gray-800">实时数据监控</span>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button className="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm font-medium shadow-sm hover:bg-neutral-50 transition-colors">导出报表</button>
-          <button className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium shadow-md shadow-red-600/20 hover:bg-red-700 transition-colors">系统公告</button>
+        <div className="space-x-3">
+          <button className="px-4 py-1.5 bg-white border border-gray-300 rounded text-sm hover:text-[#1890ff] hover:border-[#1890ff] transition-colors">导出今日报表</button>
+          <button className="px-4 py-1.5 bg-[#1890ff] text-white border border-[#1890ff] rounded text-sm hover:bg-[#40a9ff] hover:border-[#40a9ff] transition-colors">刷新数据</button>
         </div>
-      </header>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {STATS.map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-neutral-100 hover:shadow-md transition-shadow">
+          <div key={i} className="bg-white p-5 rounded-sm border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.color}`}>
-                <stat.icon className="w-6 h-6" />
+              <span className="text-sm text-gray-500">{stat.title}</span>
+              <div className="p-1.5 rounded-sm" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                <stat.icon className="w-5 h-5" />
               </div>
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${stat.change.startsWith('+') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+            </div>
+            <div className="flex items-end gap-3">
+              <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+              <span className={`text-sm flex items-center mb-1 ${stat.change.startsWith('+') ? 'text-[#f5222d]' : 'text-[#52c41a]'}`}>
+                {stat.change.startsWith('+') ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingUp className="w-3 h-3 mr-0.5 rotate-180" />}
                 {stat.change}
               </span>
             </div>
-            <div>
-              <p className="text-3xl font-black text-neutral-900 tracking-tight">{stat.value}</p>
-              <p className="text-sm text-neutral-500 font-medium mt-1">{stat.title}</p>
+            <div className="w-full bg-gray-100 h-1 mt-4 rounded-full overflow-hidden">
+              <div className="h-full rounded-full" style={{ width: '70%', backgroundColor: stat.color }}></div>
             </div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 flex flex-col items-center justify-center min-h-[300px]">
-          <Activity className="w-12 h-12 text-neutral-200 mb-4" />
-          <p className="text-neutral-500 font-medium">此处未来接入 ECharts / Recharts 渲染日活曲线图</p>
+        <div className="lg:col-span-2 bg-white rounded-sm border border-gray-200 p-5 shadow-sm min-h-[300px] flex flex-col">
+          <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-4">
+            <h3 className="font-bold text-gray-800">平台日活趋势 (DAU & MAU)</h3>
+            <select className="text-sm border border-gray-300 rounded px-2 py-1 outline-none focus:border-[#1890ff]">
+              <option>最近7天</option>
+              <option>本月</option>
+            </select>
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center">
+             <Activity className="w-12 h-12 text-gray-300 mb-2" />
+             <p className="text-gray-400 text-sm">等待 ECharts 图表库接入...</p>
+          </div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
-          <h3 className="font-bold text-neutral-900 mb-4">最新服务器告警</h3>
+
+        <div className="bg-white rounded-sm border border-gray-200 p-5 shadow-sm">
+          <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-4">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+              系统告警中心 <span className="bg-[#fff1f0] border border-[#ffa39e] text-[#f5222d] text-xs px-2 py-0.5 rounded-full">3</span>
+            </h3>
+          </div>
           <div className="space-y-4">
             {[1, 2, 3].map((_, i) => (
-              <div key={i} className="flex items-start gap-3 pb-4 border-b border-neutral-100 last:border-0 last:pb-0">
-                <div className="w-2 h-2 mt-2 rounded-full bg-red-500 shrink-0"></div>
+              <div key={i} className="flex gap-3 items-start pb-4 border-b border-gray-50 last:border-0 last:pb-0">
+                <AlertTriangle className="w-4 h-4 mt-0.5 text-[#faad14]" />
                 <div>
-                  <p className="text-sm font-medium text-neutral-900">节点负载过高 (LiveKit Node 3)</p>
-                  <p className="text-xs text-neutral-500 mt-1">10 分钟前</p>
+                  <p className="text-sm text-gray-800 font-medium">跳车率异常偏高 (剧本ID: 1002)</p>
+                  <p className="text-xs text-gray-400 mt-1">2026-04-06 14:32:11</p>
                 </div>
               </div>
             ))}
