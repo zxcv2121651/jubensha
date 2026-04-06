@@ -1,13 +1,15 @@
-export const scripts = [
+export const scripts: any[] = [
   {
     id: '1', title: '良辰吉日', tags: ['民国', '情感', '阵营', '悬疑'], players: { male: 3, female: 3, any: 0 }, duration: '4-5小时', difficulty: '进阶', description: '民国二十六年...', rating: 9.2,
     roles: [{ id: 'c1', name: '林少爷', gender: 'male' }, { id: 'c2', name: '苏小姐', gender: 'female' }],
-    acts: { 'act_1': { title: '第一幕', content: '那是一个下雨的夜晚...' }, 'act_2': { title: '第二幕', content: '尸体被发现了...' } },
-    isUgc: false, approvalStatus: 'approved'
-  },
-  { id: '2', title: '长安夜行', tags: ['古风', '推理', '武侠', '悬疑'], players: { male: 4, female: 2, any: 1 }, duration: '5-6小时', difficulty: '烧脑', description: '天宝十四载...', rating: 9.5, roles: [], acts: {}, isUgc: false, approvalStatus: 'approved' },
-  { id: 'script_ugc_1', title: '玩家投稿剧本_待审', tags: ['现代'], players: { male: 2, female: 2, any: 0 }, duration: '3小时', difficulty: '新手', description: '测试用投稿本', rating: 0, roles: [], acts: {}, isUgc: true, authorId: 'user_2', approvalStatus: 'pending' }
+    acts: [{ id: 'act_1', title: '第一幕', content: '那是一个下雨的夜晚...' }, { id: 'act_2', title: '第二幕', content: '尸体被发现了...' }],
+    clues: [{ id: 'clue_1', title: '匕首', description: '带血的匕首', condition: null }],
+    isUgc: false, approvalStatus: 'approved', authorId: 'sys'
+  }
 ];
+
+// Drafts for UGC Editor (Separate from published scripts)
+export const ugcDrafts: any[] = [];
 
 export const reviews: any[] = [
   { id: 'r1', scriptId: '1', user: '剧本杀老司机', userId: 'user_1', rating: 5, content: '强推！', date: '2023-10-01', likes: 10 }
@@ -31,9 +33,9 @@ export const users: any[] = [
   {
     id: 'user_1', username: 'admin', password: 'password123', name: '剧本杀老司机', bio: '推理无情，沉浸有爱。', avatar: 'https://picsum.photos/seed/u1/150/150', stats: { played: 42, favorites: 15, reviews: 8, rating: 4.9 },
     history: [{ id: 'h1', scriptId: '1', role: '林少爷', date: '2023-10-01', dm: '小黑', location: '线上车队', resultSummary: '成功推凶' }],
-    favorites: ['1', '2'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000,
+    favorites: ['1'], friends: ['user_2'], blacklist: [], inventory: [], library: ['1'], achievements: ['ach_1', 'ach_2'], balance: 1000,
     isVip: false, vipExpiry: null, dmTipsReceived: 0, quests: JSON.parse(JSON.stringify(quests)), clubId: 'club_1',
-    wishlist: ['2'], checkinStreak: 5, lastCheckin: Date.now() - 86400000, // yesterday
+    wishlist: [], checkinStreak: 5, lastCheckin: Date.now() - 86400000,
     isAdmin: true, accountStatus: 'active'
   },
   {
