@@ -1,13 +1,34 @@
+import { useState, useEffect } from 'react';
 import { Users, Activity, PlayCircle, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
 
-const STATS = [
-  { title: '今日开局总数', value: '342', change: '+5%', icon: PlayCircle, color: '#52c41a' },
-  { title: '平台活跃玩家', value: '12,450', change: '+12%', icon: Users, color: '#1890ff' },
-  { title: '注册 DM 人数', value: '1,192', change: '+2%', icon: Activity, color: '#722ed1' },
-  { title: '今日流水分成', value: '￥24,500', change: '-3%', icon: DollarSign, color: '#fa8c16' },
-];
+interface StatData {
+  value: number;
+  change: string;
+}
+
+interface DashboardStats {
+  totalUsers: StatData;
+  activeRooms: StatData;
+  totalDms: StatData;
+  dailyRevenue: StatData;
+}
 
 export default function Dashboard() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  useEffect(() => {
+    fetch('http://localhost:3001/api/admin/stats', { headers: { 'x-admin-id': 'user_1' } })
+      .then(res => res.json())
+      .then(data => { if (data.success) setStats(data.data); });
+  }, []);
+
+  const STATS_CONFIG = stats ? [
+    { title: '正在进行的对局', value: stats.activeRooms.value, change: stats.activeRooms.change, icon: PlayCircle, color: '#52c41a' },
+    { title: '平台活跃玩家', value: stats.totalUsers.value, change: stats.totalUsers.change, icon: Users, color: '#1890ff' },
+    { title: '全服注册 DM', value: stats.totalDms.value, change: stats.totalDms.change, icon: Activity, color: '#722ed1' },
+    { title: '全站剩余虚拟币', value: `￥${stats.dailyRevenue.value}`, change: stats.dailyRevenue.change, icon: DollarSign, color: '#fa8c16' },
+  ] : [];
+
   return (
     <div className="flex-1 h-screen overflow-y-auto bg-[#f0f2f5] p-6">
       <div className="mb-6 flex items-center justify-between">
@@ -25,28 +46,32 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {STATS.map((stat, i) => (
-          <div key={i} className="bg-white p-5 rounded-sm border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-gray-500">{stat.title}</span>
-              <div className="p-1.5 rounded-sm" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                <stat.icon className="w-5 h-5" />
+      {!stats ? (
+        <div className="p-12 text-center text-gray-500">加载数据中...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          {STATS_CONFIG.map((stat, i) => (
+            <div key={i} className="bg-white p-5 rounded-sm border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-gray-500">{stat.title}</span>
+                <div className="p-1.5 rounded-sm" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                  <stat.icon className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="flex items-end gap-3">
+                <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+                <span className={`text-sm flex items-center mb-1 ${stat.change.startsWith('+') ? 'text-[#f5222d]' : 'text-[#52c41a]'}`}>
+                  {stat.change.startsWith('+') ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingUp className="w-3 h-3 mr-0.5 rotate-180" />}
+                  {stat.change}
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 h-1 mt-4 rounded-full overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: '70%', backgroundColor: stat.color }}></div>
               </div>
             </div>
-            <div className="flex items-end gap-3">
-              <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
-              <span className={`text-sm flex items-center mb-1 ${stat.change.startsWith('+') ? 'text-[#f5222d]' : 'text-[#52c41a]'}`}>
-                {stat.change.startsWith('+') ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingUp className="w-3 h-3 mr-0.5 rotate-180" />}
-                {stat.change}
-              </span>
-            </div>
-            <div className="w-full bg-gray-100 h-1 mt-4 rounded-full overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: '70%', backgroundColor: stat.color }}></div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-sm border border-gray-200 p-5 shadow-sm min-h-[300px] flex flex-col">

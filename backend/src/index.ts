@@ -729,3 +729,35 @@ app.delete('/api/admin/store/:id', adminOnly, (req, res) => {
   const deletedItem = storeItems.splice(itemIndex, 1);
   res.json({ success: true, data: deletedItem });
 });
+
+// --- Dashboard Statistics API ---
+app.get('/api/admin/stats', adminOnly, (req, res) => {
+  const activeUsers = users.filter(u => u.accountStatus === 'active').length;
+  const playingRooms = rooms.filter(r => r.status === 'playing').length;
+  const totalRevenue = users.reduce((acc, user) => acc + (user.balance || 0), 0); // Mocking revenue via current balances
+  const totalDMs = users.filter(u => u.hostedRooms && u.hostedRooms.length > 0).length || 0;
+
+  // Mocking change percentages
+  const stats = {
+    totalUsers: { value: activeUsers, change: '+2%' },
+    activeRooms: { value: playingRooms, change: '+5%' },
+    totalDms: { value: totalDMs, change: '+1%' },
+    dailyRevenue: { value: totalRevenue, change: '-1%' }
+  };
+  res.json({ success: true, data: stats });
+});
+
+// --- Moderation Logs API ---
+// We use 'reports' array to mock logs if they are resolved
+app.get('/api/admin/logs', adminOnly, (req, res) => {
+  const logs = reports
+    .filter(r => r.status !== 'pending')
+    .map(r => ({
+      id: r.id,
+      action: r.status === 'resolved' ? 'Ban User' : 'Dismissed Report',
+      targetId: r.targetId,
+      reason: r.reason,
+      createdAt: r.createdAt
+    }));
+  res.json({ success: true, data: logs });
+});
