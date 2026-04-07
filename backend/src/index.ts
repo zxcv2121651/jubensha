@@ -769,3 +769,22 @@ app.get('/api/admin/scripts/:id/preview', adminOnly, (req, res) => {
   if (!script) return res.status(404).json({ success: false, message: 'Script or draft not found' });
   res.json({ success: true, data: script });
 });
+
+// --- System Settings API ---
+import { sysSettings } from './data';
+
+app.get('/api/admin/settings', adminOnly, (req, res) => {
+  res.json({ success: true, data: sysSettings });
+});
+
+app.put('/api/admin/settings', adminOnly, (req, res) => {
+  if (req.body.maintenanceMode !== undefined) sysSettings.maintenanceMode = req.body.maintenanceMode;
+  if (req.body.globalMute !== undefined) sysSettings.globalMute = req.body.globalMute;
+  if (req.body.maxQueueSize !== undefined) sysSettings.maxQueueSize = req.body.maxQueueSize;
+  if (req.body.signupBonus !== undefined) sysSettings.signupBonus = req.body.signupBonus;
+
+  // If global mute is enabled, emit to all rooms (mock logic)
+  if (sysSettings.globalMute) io.emit('dmMuteAll', { mute: true });
+
+  res.json({ success: true, data: sysSettings });
+});

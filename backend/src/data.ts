@@ -63,3 +63,10 @@ export const rankedQueues: Record<string, Record<string, string[]>> = {
   '钻石': {},
   '王者': {}
 };
+
+export const sysSettings = {
+  maintenanceMode: false,
+  globalMute: false,
+  maxQueueSize: 500,
+  signupBonus: 100
+};

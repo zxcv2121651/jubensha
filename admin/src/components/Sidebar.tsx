@@ -49,11 +49,11 @@ export default function Sidebar() {
         <div className="flex items-center gap-3 mb-4 px-2">
           <img src="https://picsum.photos/seed/admin/40/40" className="w-8 h-8 rounded-full border border-neutral-600" alt="Admin" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-white truncate">超管_001</p>
+            <p className="text-xs font-medium text-white truncate">{localStorage.getItem('adminName') || '超管_001'}</p>
             <p className="text-[10px] text-neutral-500 truncate">admin@jubensha.com</p>
           </div>
         </div>
-        <button className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-transparent border border-neutral-600 hover:border-neutral-400 text-neutral-400 hover:text-white rounded transition-colors text-xs font-medium">
+        <button onClick={() => { localStorage.clear(); window.location.href='/login'; }} className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-transparent border border-neutral-600 hover:border-neutral-400 text-neutral-400 hover:text-white rounded transition-colors text-xs font-medium">
           <LogOut className="w-3.5 h-3.5" />
           安全退出
         </button>
