@@ -1,0 +1,471 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. USER, SOCIAL & PROGRESSION
+// ==========================================
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  password      String
+  name          String
+  bio           String?
+  avatar        String?
+  phone         String?   @unique // Real-name authentication
+  balance       Int       @default(0) // Virtual currency
+  accountStatus String    @default("active") // active, banned, suspended
+  isAdmin       Boolean   @default(false)
+  lastLoginIp   String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Progression & Stats
+  playedCount   Int       @default(0)
+  rating        Float     @default(0.0)
+  checkinStreak Int       @default(0)
+  lastCheckin   DateTime?
+
+  // VIP / Subscription
+  isVip     Boolean   @default(false)
+  vipExpiry DateTime?
+
+  // Social & Clubs
+  club     Club?   @relation("ClubMembers", fields: [clubId], references: [id])
+  clubId   String?
+  clubRole String? @default("member") // owner, admin, member
+
+  // Self-Relations (Friends & Blacklist)
+  friends       User[] @relation("UserFriends")
+  friendsOf     User[] @relation("UserFriends")
+  blacklist     User[] @relation("UserBlacklist")
+  blacklistedBy User[] @relation("UserBlacklist")
+
+  // Relationships to other entities
+  reviews     Review[]
+  hostedRooms Room[]       @relation("HostRooms")
+  playerRooms RoomPlayer[]
+
+  messagesSent     DirectMessage[] @relation("MessageSender")
+  messagesReceived DirectMessage[] @relation("MessageReceiver")
+
+  notifications Notification[]
+  inventory     UserInventory[]
+  library       UserLibrary[]
+  favorites     UserFavorite[]
+  wishlist      UserWishlist[]
+  achievements  UserAchievement[]
+  quests        UserQuest[]
+
+  reportsFiled Report[] @relation("Reporter")
+
+  // Ledgers & Transactions
+  transactions Transaction[]
+  gachaPulls   GachaHistory[]
+
+  // Match History & Matchmaking
+  matchHistory     MatchHistory[]
+  matchmakingQueue MatchmakingQueue[]
+
+  // Moderation
+  moderationLogs ModerationLog[] @relation("TargetUser")
+
+  // UGC
+  authoredScripts Script[] @relation("AuthorScripts")
+}
+
+// ==========================================
+// 2. CONTENT & SCRIPTS (Game Definitions & UGC)
+// ==========================================
+model Script {
+  id          String   @id @default(cuid())
+  title       String
+  duration    String
+  difficulty  String   @default("新手") // 新手, 进阶, 烧脑
+  description String
+  rating      Float    @default(0.0)
+  tags        String[]
+
+  // Player Configuration
+  maleCount   Int @default(0)
+  femaleCount Int @default(0)
+  anyCount    Int @default(0)
+
+  // Pricing
+  price Int @default(0) // 0 means free to play
+
+  // UGC & Review Process
+  isUgc          Boolean @default(false)
+  authorId       String?
+  author         User?   @relation("AuthorScripts", fields: [authorId], references: [id])
+  approvalStatus String  @default("approved") // draft, pending, approved, rejected
+  version        Int     @default(1)
+
+  // Content Structure
+  roles ScriptRole[]
+  acts  ScriptAct[]
+  clues ScriptClue[]
+
+  // Relations
+  reviews        Review[]
+  rooms          Room[]
+  libraries      UserLibrary[]
+  favorites      UserFavorite[]
+  wishlists      UserWishlist[]
+  matchHistories MatchHistory[]
+  queues         MatchmakingQueue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ScriptRole {
+  id        String  @id @default(cuid())
+  scriptId  String
+  script    Script  @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  name      String
+  gender    String // male, female, any
+  desc      String?
+  avatarUrl String?
+}
+
+model ScriptAct {
+  id       String @id @default(cuid())
+  scriptId String
+  script   Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  title    String
+  content  String // Markdown or rich text
+  order    Int    @default(0)
+}
+
+model ScriptClue {
+  id          String  @id @default(cuid())
+  scriptId    String
+  script      Script  @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  imageUrl    String?
+  isPublic    Boolean @default(true)
+}
+
+// ==========================================
+// 3. LOBBY, MATCHMAKING & LIVE ROOMS
+// ==========================================
+model MatchmakingQueue {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scriptId String
+  script   Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+
+  @@unique([userId, scriptId])
+}
+
+model Room {
+  id       String @id @default(cuid())
+  scriptId String
+  script   Script @relation(fields: [scriptId], references: [id])
+
+  hostId String
+  host   User   @relation("HostRooms", fields: [hostId], references: [id])
+
+  status        String  @default("waiting") // waiting, playing, finished, cancelled
+  password      String?
+  isPublic      Boolean @default(true)
+  targetPlayers Int
+
+  // Voice Server bindings (LiveKit)
+  voiceRoomId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Players inside the room
+  players RoomPlayer[]
+
+  // Live State
+  state   RoomState?
+  chatLog RoomMessage[]
+  results GameResult?
+}
+
+model RoomPlayer {
+  id     String @id @default(cuid())
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isReady  Boolean  @default(false)
+  roleId   String? // Assigned ScriptRole
+  joinedAt DateTime @default(now())
+
+  @@unique([roomId, userId])
+}
+
+model RoomState {
+  roomId String @id
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  currentActId  String?
+  revealedClues String[] // Array of clue IDs
+  isPaused      Boolean  @default(false)
+
+  // Mapping JSON structures
+  votes       Json? // { voterId: targetRoleId }
+  inventories Json? // { userId: [item1, item2] }
+
+  updatedAt DateTime @updatedAt
+}
+
+model RoomMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  text      String
+  isPrivate Boolean  @default(false)
+  targetId  String? // If it's a whisper
+  createdAt DateTime @default(now())
+}
+
+model GameResult {
+  roomId         String   @id
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  mvpId          String?
+  winningFaction String?
+  summary        String? // Text recap
+  timeline       Json? // Replay events: [{timestamp, type, desc}]
+  createdAt      DateTime @default(now())
+}
+
+model MatchHistory {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scriptId      String
+  script        Script   @relation(fields: [scriptId], references: [id])
+  rolePlayed    String
+  dmName        String
+  location      String // online, offline store
+  resultSummary String?
+  playedAt      DateTime @default(now())
+}
+
+// ==========================================
+// 4. ECONOMY, STORE & GACHA
+// ==========================================
+model StoreItem {
+  id       String  @id @default(cuid())
+  name     String
+  type     String // avatar_frame, chat_bubble, subscription, gacha_ticket
+  price    Int
+  isActive Boolean @default(true)
+
+  inventories UserInventory[]
+  gachaDrops  GachaPool[]
+}
+
+model UserInventory {
+  userId   String
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId   String
+  item     StoreItem @relation(fields: [itemId], references: [id])
+  quantity Int       @default(1)
+
+  @@id([userId, itemId])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String // topup, purchase, tip, quest_reward
+  amount      Int // + or -
+  referenceId String? // Order ID from WeChat/Alipay or Item ID
+  status      String   @default("completed") // pending, completed, failed
+  createdAt   DateTime @default(now())
+}
+
+model PromoCode {
+  code      String    @id
+  reward    Int
+  type      String    @default("balance")
+  maxUses   Int       @default(9999)
+  usesCount Int       @default(0)
+  expiresAt DateTime?
+}
+
+// Gacha System
+model GachaPool {
+  id         String    @id @default(cuid())
+  itemId     String
+  item       StoreItem @relation(fields: [itemId], references: [id])
+  dropRate   Float // 0.0 to 1.0
+  isFeatured Boolean   @default(false)
+
+  history GachaHistory[]
+}
+
+model GachaHistory {
+  id       String    @id @default(cuid())
+  userId   String
+  user     User      @relation(fields: [userId], references: [id])
+  poolId   String
+  pool     GachaPool @relation(fields: [poolId], references: [id])
+  pulledAt DateTime  @default(now())
+}
+
+// ==========================================
+// 5. SOCIAL & INTERACTION
+// ==========================================
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  content   String
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scriptId String
+  script   Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+}
+
+model Club {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  leaderId    String
+  createdAt   DateTime @default(now())
+
+  members User[] @relation("ClubMembers")
+}
+
+model DirectMessage {
+  id         String   @id @default(cuid())
+  senderId   String
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  text       String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // friend_request, system, alert, club_invite
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// 6. QUESTS & ACHIEVEMENTS
+// ==========================================
+model Quest {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  reward      Int
+  type        String  @default("daily") // daily, weekly, lifetime
+
+  userQuests UserQuest[]
+}
+
+model UserQuest {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId   String
+  quest     Quest    @relation(fields: [questId], references: [id], onDelete: Cascade)
+  progress  Int      @default(0)
+  isClaimed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, questId])
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  name        String
+  description String
+  icon        String
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime    @default(now())
+
+  @@id([userId, achievementId])
+}
+
+// ==========================================
+// 7. MODERATION & ADMIN
+// ==========================================
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  reporter   User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetId   String
+  targetType String // user, room, review, script
+  reason     String
+  status     String   @default("pending") // pending, resolved, dismissed
+  adminNotes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ModerationLog {
+  id           String   @id @default(cuid())
+  adminId      String // The admin who performed the action
+  targetUserId String
+  targetUser   User     @relation("TargetUser", fields: [targetUserId], references: [id])
+  action       String // ban, warn, unban, reject_ugc
+  reason       String
+  createdAt    DateTime @default(now())
+}
+
+// ==========================================
+// 8. JUNCTION TABLES
+// ==========================================
+model UserLibrary {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scriptId   String
+  script     Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  acquiredAt DateTime @default(now())
+
+  @@id([userId, scriptId])
+}
+
+model UserFavorite {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scriptId String
+  script   Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@id([userId, scriptId])
+}
+
+model UserWishlist {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scriptId String
+  script   Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@id([userId, scriptId])
+}
